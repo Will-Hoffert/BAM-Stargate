@@ -53,13 +53,13 @@ namespace StargateAPI.Business.Commands
         public async Task<CreateAstronautDutyResult> Handle(CreateAstronautDuty request, CancellationToken cancellationToken)
         {
 
-            var query = $"SELECT * FROM [Person] WHERE \'{request.Name}\' = Name";
+            var query = "SELECT * FROM [Person] WHERE @Name = Name";
 
-            var person = await _context.Connection.QueryFirstOrDefaultAsync<Person>(query);
+            var person = await _context.Connection.QueryFirstOrDefaultAsync<Person>(query, new { request.Name });
 
-            query = $"SELECT * FROM [AstronautDetail] WHERE {person.Id} = PersonId";
+            query = "SELECT * FROM [AstronautDetail] WHERE @PersonId = PersonId";
 
-            var astronautDetail = await _context.Connection.QueryFirstOrDefaultAsync<AstronautDetail>(query);
+            var astronautDetail = await _context.Connection.QueryFirstOrDefaultAsync<AstronautDetail>(query, new { PersonId = person.Id });
 
             if (astronautDetail == null)
             {
@@ -87,9 +87,9 @@ namespace StargateAPI.Business.Commands
                 _context.AstronautDetails.Update(astronautDetail);
             }
 
-            query = $"SELECT * FROM [AstronautDuty] WHERE {person.Id} = PersonId Order By DutyStartDate Desc";
+            query = "SELECT * FROM [AstronautDuty] WHERE @PersonId = PersonId Order By DutyStartDate Desc";
 
-            var astronautDuty = await _context.Connection.QueryFirstOrDefaultAsync<AstronautDuty>(query);
+            var astronautDuty = await _context.Connection.QueryFirstOrDefaultAsync<AstronautDuty>(query, new { PersonId = person.Id });
 
             if (astronautDuty != null)
             {
