@@ -3,6 +3,11 @@
   text-decoration: none;
 }
 
+// Keeps the progress bar's space while it's hidden, so the page doesn't move when it appears.
+.progress {
+  height: 4px;
+}
+
 main {
   padding: 24px;
 }

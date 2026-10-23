@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   ApplicationConfig,
   inject,
@@ -8,12 +8,13 @@ import {
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { RuntimeConfig } from './config/runtime-config';
+import { loadingInterceptor } from './loading/loading-interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([loadingInterceptor])),
     // Nothing can call the API without its address, so the app waits for config.json before starting.
     provideAppInitializer(() => inject(RuntimeConfig).load())
   ]

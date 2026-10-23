@@ -2,6 +2,11 @@
   <mat-toolbar>
     <a class="app-name" routerLink="/">Stargate ACTS</a>
   </mat-toolbar>
+  <div class="progress">
+    @if (loading.isLoading()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading" />
+    }
+  </div>
 </header>
 <main>
   <router-outlet />
