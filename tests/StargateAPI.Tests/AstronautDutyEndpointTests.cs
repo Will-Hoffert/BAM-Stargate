@@ -1,8 +1,11 @@
 using System.Net.Http.Json;
+using MediatR;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using StargateAPI.Business.Commands;
 using StargateAPI.Business.Data;
+using StargateAPI.Business.Queries;
 
 namespace StargateAPI.Tests
 {
@@ -79,6 +82,19 @@ namespace StargateAPI.Tests
             var detail = await context.AstronautDetails.AsNoTracking().SingleAsync(d => d.PersonId == personId);
             Assert.Equal("RETIRED", detail.CurrentDutyTitle);
             Assert.Equal(new DateTime(2024, 2, 29), detail.CareerEndDate);
+        }
+
+        [Fact]
+        public async Task GetAstronautDutiesByName_UnknownPerson_ThrowsNotFound()
+        {
+            // Sent through MediatR directly: GET /AstronautDuty/{name} does not dispatch this query yet.
+            using var scope = _factory.Services.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+            var exception = await Assert.ThrowsAsync<BadHttpRequestException>(
+                () => mediator.Send(new GetAstronautDutiesByName { Name = "Nobody By This Name" }));
+
+            Assert.Equal(StatusCodes.Status404NotFound, exception.StatusCode);
         }
 
         private async Task<int> CreatePersonAsync(string name)
