@@ -155,6 +155,33 @@ namespace StargateAPI.Tests
             Assert.False(await context.AstronautDetails.AnyAsync(d => d.Person.Name == "Never Served Person"));
         }
 
+        [Fact]
+        public async Task CreateAstronautDuty_AfterRetirement_ReturnsConflict()
+        {
+            await CreatePersonAsync("Retired Person");
+            (await PostDutyAsync("Retired Person", "Engineer", new DateTime(2018, 3, 1))).EnsureSuccessStatusCode();
+            (await PostDutyAsync("Retired Person", "RETIRED", new DateTime(2024, 3, 1))).EnsureSuccessStatusCode();
+
+            var response = await PostDutyAsync("Retired Person", "Pilot", new DateTime(2025, 1, 1));
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.NotNull(body);
+            Assert.False(body.Success);
+            Assert.Equal("'Retired Person' retired on 2024-03-01 and can't be given new duties.", body.Message);
+
+            var duties = await GetDutiesOldestFirstAsync("Retired Person");
+            Assert.Equal(2, duties.Count);
+            Assert.Equal("RETIRED", duties[1].DutyTitle);
+            Assert.Null(duties[1].DutyEndDate);
+
+            using var scope = _factory.Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<StargateContext>();
+            var detail = await context.AstronautDetails.AsNoTracking().SingleAsync(d => d.Person.Name == "Retired Person");
+            Assert.Equal("RETIRED", detail.CurrentDutyTitle);
+            Assert.Equal(new DateTime(2024, 2, 29), detail.CareerEndDate);
+        }
+
         private async Task CreatePersonAsync(string name)
         {
             var response = await _client.PostAsJsonAsync("/Person", name);
