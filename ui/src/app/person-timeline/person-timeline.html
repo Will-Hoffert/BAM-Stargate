@@ -35,7 +35,14 @@
     </dl>
   }
 
-  <h2>Duties</h2>
+  <div class="duties-heading">
+    <h2>Duties</h2>
+    @if (retiredOn(); as retiredOn) {
+      <p class="retired-note">Retired on {{ retiredOn | date }}, so no more duties can be added.</p>
+    } @else {
+      <button matButton="filled" (click)="addDuty()">Add duty</button>
+    }
+  </div>
   @if (entries().length === 0) {
     <p>No duties yet.</p>
   } @else {

@@ -1,0 +1,51 @@
+<h2 mat-dialog-title>New duty for {{ data.name }}</h2>
+<form [formRoot]="duty">
+  <mat-dialog-content>
+    <mat-form-field appearance="outline">
+      <mat-label>Rank</mat-label>
+      <input matInput [formField]="duty.rank" autocomplete="off" />
+      <mat-hint align="end">{{ duty.rank().value().trim().length }} / {{ maxLength }}</mat-hint>
+      @for (error of duty.rank().errors(); track error.kind) {
+        <mat-error>{{ error.message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Duty title</mat-label>
+      <input matInput [formField]="duty.dutyTitle" autocomplete="off" />
+      @if (isRetirement(duty.dutyTitle().value())) {
+        <mat-hint>This ends {{ data.name }}'s career. No duties can be added after it.</mat-hint>
+      }
+      <mat-hint align="end"
+        >{{ duty.dutyTitle().value().trim().length }} / {{ maxLength }}</mat-hint
+      >
+      @for (error of duty.dutyTitle().errors(); track error.kind) {
+        <mat-error>{{ error.message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Start date</mat-label>
+      <input
+        matInput
+        [matDatepicker]="picker"
+        [formField]="duty.dutyStartDate"
+        [min]="minStartDate"
+        autocomplete="off"
+      />
+      <mat-datepicker-toggle matIconSuffix [for]="picker" />
+      <mat-datepicker #picker />
+      @for (message of startDateErrors(); track message) {
+        <mat-error>{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    @if (problem(); as problem) {
+      <p role="alert">{{ problem }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button matButton type="button" (click)="cancel()">Cancel</button>
+    <button matButton="filled" type="submit" [disabled]="duty().submitting()">Save</button>
+  </mat-dialog-actions>
+</form>

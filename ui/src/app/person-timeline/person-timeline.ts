@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { MatButton } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
 import { toApiDate } from '../api/api-dates';
 import { ApiError, errorMessage } from '../api/api-error';
@@ -9,7 +10,9 @@ import { AstronautDuty, IsoDate } from '../api/api-models';
 import { StargateApi } from '../api/stargate-api';
 import { personStatus } from '../people/person-status';
 import { StatusPill } from '../people/status-pill/status-pill';
+import { isRetirement } from './duty-rules';
 import { formatDuration } from './duration';
+import { NewDutyData, NewDutyDialog } from './new-duty-dialog/new-duty-dialog';
 
 interface TimelineEntry extends AstronautDuty {
   kind: 'current' | 'past' | 'retirement';
@@ -24,6 +27,7 @@ interface TimelineEntry extends AstronautDuty {
 })
 export class PersonTimeline {
   private readonly api = inject(StargateApi);
+  private readonly dialog = inject(MatDialog);
 
   /** From the URL, e.g. /people/John%20Doe. */
   readonly name = input.required<string>();
@@ -61,16 +65,35 @@ export class PersonTimeline {
     );
   });
 
+  // RETIRED is final: the API refuses any duty after it, so the page doesn't offer one.
+  protected readonly retiredOn = computed(
+    () => this.entries().find((entry) => entry.kind === 'retirement')?.dutyStartDate ?? null,
+  );
+
   protected isNotFound(error: Error): boolean {
     return error instanceof ApiError && error.status === 404;
+  }
+
+  protected addDuty(): void {
+    if (!this.career.hasValue()) return;
+    const { person, duties } = this.career.value();
+    this.dialog
+      .open<NewDutyDialog, NewDutyData, boolean>(NewDutyDialog, {
+        width: '440px',
+        data: {
+          name: person.name,
+          currentRank: person.currentRank,
+          // The API lists duties newest first.
+          currentDutyStartDate: duties[0]?.dutyStartDate ?? null,
+        },
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) this.career.reload();
+      });
   }
 }
 
 function today(): IsoDate {
   return toApiDate(new Date());
-}
-
-// The API stores RETIRED in capitals but recognizes it in any case, so this does too.
-function isRetirement(dutyTitle: string): boolean {
-  return dutyTitle.toUpperCase() === 'RETIRED';
 }

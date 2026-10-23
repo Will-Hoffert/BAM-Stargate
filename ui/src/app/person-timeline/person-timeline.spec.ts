@@ -1,10 +1,15 @@
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { TestBed } from '@angular/core/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
+import { MATERIAL_ANIMATIONS } from '@angular/material/core';
+import { MatDatepickerInputHarness } from '@angular/material/datepicker/testing';
+import { MatDialogHarness } from '@angular/material/dialog/testing';
+import { MatFormFieldHarness } from '@angular/material/form-field/testing';
+import { MatInputHarness } from '@angular/material/input/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 import { ApiError } from '../api/api-error';
-import { Person, PersonDuties } from '../api/api-models';
+import { NewDuty, Person, PersonDuties } from '../api/api-models';
 import { StargateApi } from '../api/stargate-api';
 import { PersonTimeline } from './person-timeline';
 
@@ -52,10 +57,19 @@ const retiredCareer: PersonDuties = {
   ],
 };
 
-async function render(name: string, getDuties: (name: string) => Observable<PersonDuties>) {
+async function render(
+  name: string,
+  getDuties: (name: string) => Observable<PersonDuties>,
+  addDuty: (duty: NewDuty) => Observable<number> = () => of(1),
+) {
   TestBed.configureTestingModule({
     imports: [PersonTimeline],
-    providers: [provideRouter([]), { provide: StargateApi, useValue: { getDuties } }],
+    providers: [
+      provideRouter([]),
+      { provide: StargateApi, useValue: { getDuties, addDuty } },
+      // Without animations a dialog closes straight away, so tests don't wait on a timer.
+      { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
+    ],
   });
   const fixture = TestBed.createComponent(PersonTimeline);
   fixture.componentRef.setInput('name', name);
@@ -63,6 +77,8 @@ async function render(name: string, getDuties: (name: string) => Observable<Pers
   return {
     element: fixture.nativeElement as HTMLElement,
     loader: TestbedHarnessEnvironment.loader(fixture),
+    // Dialogs open outside the page's own element.
+    documentLoader: TestbedHarnessEnvironment.documentRootLoader(fixture),
   };
 }
 
@@ -165,6 +181,67 @@ describe('PersonTimeline', () => {
     expect(element.textContent).toContain('No duties yet.');
     expect(facts(element)).toEqual({});
     expect(entries(element)).toEqual([]);
+  });
+
+  it('should offer Add duty to someone who has not retired', async () => {
+    const { loader } = await render('John Doe', () => of(activeCareer));
+    expect(
+      await loader.getHarnessOrNull(MatButtonHarness.with({ text: 'Add duty' })),
+    ).not.toBeNull();
+  });
+
+  it('should not offer Add duty to someone who has retired', async () => {
+    const { element, loader } = await render('Amy Ray', () => of(retiredCareer));
+
+    expect(await loader.getHarnessOrNull(MatButtonHarness.with({ text: 'Add duty' }))).toBeNull();
+    expect(text(element.querySelector('.retired-note')!)).toBe(
+      'Retired on Jan 1, 2025, so no more duties can be added.',
+    );
+  });
+
+  it('should add a duty and show the updated timeline', async () => {
+    const updatedCareer: PersonDuties = {
+      person: { ...johnDoe, currentDutyTitle: 'Flight Engineer' },
+      duties: [
+        {
+          id: 5,
+          rank: '1LT',
+          dutyTitle: 'Flight Engineer',
+          dutyStartDate: '2026-10-01',
+          dutyEndDate: null,
+        },
+        { ...activeCareer.duties[0], dutyEndDate: '2026-09-30' },
+        activeCareer.duties[1],
+      ],
+    };
+    const getDuties = vi
+      .fn()
+      .mockReturnValueOnce(of(activeCareer))
+      .mockReturnValue(of(updatedCareer));
+    const addDuty = vi.fn(() => of(5));
+    const { element, loader, documentLoader } = await render('John Doe', getDuties, addDuty);
+
+    await (await loader.getHarness(MatButtonHarness.with({ text: 'Add duty' }))).click();
+    const dialog = await documentLoader.getHarness(MatDialogHarness);
+    const titleField = await dialog.getHarness(
+      MatFormFieldHarness.with({ floatingLabelText: 'Duty title' }),
+    );
+    await (await titleField.getControl(MatInputHarness))!.setValue('Flight Engineer');
+    await (await dialog.getHarness(MatDatepickerInputHarness)).setValue('10/1/2026');
+    await (await dialog.getHarness(MatButtonHarness.with({ text: 'Save' }))).click();
+
+    expect(addDuty).toHaveBeenCalledWith({
+      name: 'John Doe',
+      rank: '1LT',
+      dutyTitle: 'Flight Engineer',
+      dutyStartDate: new Date(2026, 9, 1),
+    });
+    expect(getDuties).toHaveBeenCalledTimes(2);
+    expect(entries(element).map((entry) => text(entry.querySelector('.duty')!))).toEqual([
+      'Flight Engineer · 1LT',
+      'Commander · 1LT',
+      'Pilot · 2LT',
+    ]);
   });
 
   it('should say so when no one has that name, with a way back to the list', async () => {
