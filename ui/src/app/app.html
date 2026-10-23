@@ -1,6 +1,16 @@
 <header>
   <mat-toolbar>
     <a class="app-name" routerLink="/">Stargate ACTS</a>
+    <nav aria-label="Main">
+      <a
+        [matButton]="peopleLink.isActive ? 'tonal' : 'text'"
+        routerLink="/people"
+        routerLinkActive
+        #peopleLink="routerLinkActive"
+        ariaCurrentWhenActive="page"
+        >Possible Astronauts</a
+      >
+    </nav>
   </mat-toolbar>
   <div class="progress">
     @if (loading.isLoading()) {

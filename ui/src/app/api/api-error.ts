@@ -12,6 +12,11 @@ export class ApiError extends Error {
   }
 }
 
+/** What to tell the user about a failure. Only an ApiError's message is meant for them. */
+export function errorMessage(error: unknown): string {
+  return error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+}
+
 export function toApiError(error: HttpErrorResponse): ApiError {
   // Status 0 means no response: the API isn't running, or the browser blocked the call (CORS) and won't say why.
   if (error.status === 0) {

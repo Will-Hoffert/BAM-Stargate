@@ -25,6 +25,14 @@ describe('App', () => {
     expect(compiled.querySelector('mat-toolbar')?.textContent).toContain('Stargate ACTS');
   });
 
+  it('should link to the possible astronauts page from the toolbar', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const links = (fixture.nativeElement as HTMLElement).querySelectorAll('nav a');
+    const link = [...links].find((a) => a.textContent?.trim() === 'Possible Astronauts');
+    expect(link?.getAttribute('href')).toBe('/people');
+  });
+
   it('should show a progress bar while waiting on the API', async () => {
     const fixture = TestBed.createComponent(App);
     TestBed.inject(LoadingTracker).start();

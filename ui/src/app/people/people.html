@@ -1,0 +1,75 @@
+<h1>Possible Astronauts</h1>
+
+@if (people.error(); as error) {
+  <div class="problem" role="alert">
+    <p>{{ errorMessage(error) }}</p>
+    <button matButton="filled" (click)="people.reload()">Try again</button>
+  </div>
+} @else if (people.hasValue()) {
+  @if (people.value().length === 0) {
+    <p>No people yet.</p>
+  } @else {
+    <mat-form-field class="search" appearance="outline">
+      <mat-label>Search</mat-label>
+      <input matInput type="search" #searchBox (input)="search.set(searchBox.value)" />
+      <mat-hint>Name, rank, duty title or status</mat-hint>
+    </mat-form-field>
+
+    <div class="table-scroll">
+      <table
+        mat-table
+        [dataSource]="rows()"
+        matSort
+        matSortDisableClear
+        [matSortActive]="sort().active"
+        [matSortDirection]="sort().direction"
+        (matSortChange)="sort.set($event)"
+      >
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let person">{{ person.name }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let person">
+            <span
+              class="status"
+              [class.active]="person.status === 'Active'"
+              [class.retired]="person.status === 'Retired'"
+              >{{ person.status }}</span
+            >
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="currentRank">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Current rank</th>
+          <td mat-cell *matCellDef="let person">{{ person.currentRank }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="currentDutyTitle">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Current duty title</th>
+          <td mat-cell *matCellDef="let person">{{ person.currentDutyTitle }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="careerStartDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Career start</th>
+          <td mat-cell *matCellDef="let person">{{ person.careerStartDate | date }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="careerEndDate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Career end</th>
+          <td mat-cell *matCellDef="let person">{{ person.careerEndDate | date }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let person; columns: columns"></tr>
+        <tr class="mat-mdc-row" *matNoDataRow>
+          <td class="mat-mdc-cell no-match" [attr.colspan]="columns.length">
+            No one matches "{{ search() }}".
+          </td>
+        </tr>
+      </table>
+    </div>
+  }
+}
