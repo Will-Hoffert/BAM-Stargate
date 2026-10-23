@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StargateAPI.Business.Commands;
 using StargateAPI.Business.Data;
 using StargateAPI.Business.Queries;
+using StargateAPI.Business.Rules;
 using StargateAPI.Controllers;
 
 namespace StargateAPI.Tests
@@ -108,6 +109,96 @@ namespace StargateAPI.Tests
             Assert.NotNull(body);
             Assert.Equal("Case Duty Person", body.Person.Name);
             Assert.Single(body.AstronautDuties);
+        }
+
+        [Fact]
+        public async Task CreatePerson_NameWithSurroundingSpaces_StoresTrimmedName()
+        {
+            await CreatePersonAsync("  Trimmed Person  ");
+
+            var response = await _client.GetAsync($"/Person/{Uri.EscapeDataString("Trimmed Person")}");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<GetPersonByNameResult>();
+            Assert.Equal("Trimmed Person", body?.Person?.Name);
+        }
+
+        [Fact]
+        public async Task CreatePerson_SameNameWithSurroundingSpaces_ReturnsConflict()
+        {
+            await CreatePersonAsync("Spaced Person");
+
+            var response = await _client.PostAsJsonAsync("/Person", " Spaced Person ");
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.Equal("A person named 'Spaced Person' already exists.", body?.Message);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public async Task CreatePerson_BlankName_ReturnsBadRequest(string name)
+        {
+            var response = await _client.PostAsJsonAsync("/Person", name);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.NotNull(body);
+            Assert.False(body.Success);
+            Assert.Equal("A person's name is required.", body.Message);
+        }
+
+        [Fact]
+        public async Task CreatePerson_NameTooLong_ReturnsBadRequest()
+        {
+            var response = await _client.PostAsJsonAsync("/Person", new string('x', 101));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.Equal("A person's name can't be longer than 100 characters.", body?.Message);
+        }
+
+        [Fact]
+        public async Task CreatePerson_NameAtMaximumLength_IsAccepted()
+        {
+            var response = await _client.PostAsJsonAsync("/Person", new string('y', 100));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetPersonByName_NameWithSurroundingSpaces_FindsPerson()
+        {
+            await CreatePersonAsync("Spaced Lookup Person");
+
+            var response = await _client.GetAsync($"/Person/{Uri.EscapeDataString("  Spaced Lookup Person ")}");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<GetPersonByNameResult>();
+            Assert.Equal("Spaced Lookup Person", body?.Person?.Name);
+        }
+
+        [Fact]
+        public async Task GetAstronautDutiesByName_NameWithSurroundingSpaces_FindsPerson()
+        {
+            await CreatePersonAsync("Spaced Duty Lookup Person");
+
+            var response = await _client.GetAsync($"/AstronautDuty/{Uri.EscapeDataString(" Spaced Duty Lookup Person  ")}");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<GetAstronautDutiesByNameResult>();
+            Assert.Equal("Spaced Duty Lookup Person", body?.Person.Name);
+        }
+
+        [Theory]
+        [InlineData(null, "")]
+        [InlineData("", "")]
+        [InlineData("  Jane Doe  ", "Jane Doe")]
+        [InlineData("Jane  Doe", "Jane  Doe")]
+        public void NormalizeName_Name_TrimsOnlySurroundingWhitespace(string? name, string expected)
+        {
+            Assert.Equal(expected, PersonRules.NormalizeName(name));
         }
 
         private async Task CreatePersonAsync(string name)

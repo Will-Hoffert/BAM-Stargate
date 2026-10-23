@@ -2,6 +2,7 @@
 using MediatR.Pipeline;
 using Microsoft.EntityFrameworkCore;
 using StargateAPI.Business.Data;
+using StargateAPI.Business.Rules;
 using StargateAPI.Controllers;
 
 namespace StargateAPI.Business.Commands
@@ -20,6 +21,9 @@ namespace StargateAPI.Business.Commands
         }
         public Task Process(CreatePerson request, CancellationToken cancellationToken)
         {
+            // Written back so the duplicate check below and the handler's saved row both use the normalized name.
+            request.Name = PersonRules.ValidateName(request.Name);
+
             var person = _context.People.AsNoTracking().FirstOrDefault(z => z.Name == request.Name);
 
             if (person is not null) throw new BadHttpRequestException($"A person named '{request.Name}' already exists.", StatusCodes.Status409Conflict);

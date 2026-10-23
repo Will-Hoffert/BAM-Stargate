@@ -2,6 +2,7 @@
 using MediatR;
 using StargateAPI.Business.Data;
 using StargateAPI.Business.Dtos;
+using StargateAPI.Business.Rules;
 using StargateAPI.Controllers;
 
 namespace StargateAPI.Business.Queries
@@ -27,9 +28,11 @@ namespace StargateAPI.Business.Queries
 
             var query = "SELECT a.Id as PersonId, a.Name, b.CurrentRank, b.CurrentDutyTitle, b.CareerStartDate, b.CareerEndDate FROM [Person] a LEFT JOIN [AstronautDetail] b on b.PersonId = a.Id WHERE @Name = a.Name";
 
-            var person = await _context.Connection.QueryFirstOrDefaultAsync<PersonAstronaut>(query, new { request.Name });
+            var name = PersonRules.NormalizeName(request.Name);
 
-            if (person is null) throw new BadHttpRequestException($"No person named '{request.Name}' exists.", StatusCodes.Status404NotFound);
+            var person = await _context.Connection.QueryFirstOrDefaultAsync<PersonAstronaut>(query, new { Name = name });
+
+            if (person is null) throw new BadHttpRequestException($"No person named '{name}' exists.", StatusCodes.Status404NotFound);
 
             result.Person = person;
 
