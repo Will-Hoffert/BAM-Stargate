@@ -11,11 +11,12 @@ namespace StargateAPI.Business.Commands
 {
     public class CreateAstronautDuty : IRequest<CreateAstronautDutyResult>
     {
-        public required string Name { get; set; }
+        // Not 'required': a missing field reaches CreateAstronautDutyPreProcessor and gets the same message as a blank one.
+        public string Name { get; set; } = string.Empty;
 
-        public required string Rank { get; set; }
+        public string Rank { get; set; } = string.Empty;
 
-        public required string DutyTitle { get; set; }
+        public string DutyTitle { get; set; } = string.Empty;
 
         public DateTime DutyStartDate { get; set; }
     }
@@ -31,6 +32,13 @@ namespace StargateAPI.Business.Commands
 
         public Task Process(CreateAstronautDuty request, CancellationToken cancellationToken)
         {
+            // The request's own values are checked before any database read, and written back so every later check and the handler use them.
+            // The name only identifies an existing person, so it isn't held to the length limit for new names.
+            request.Name = PersonRules.RequireName(request.Name);
+            request.Rank = DutyRules.ValidateRank(request.Rank);
+            request.DutyTitle = DutyRules.ValidateDutyTitle(request.DutyTitle);
+            request.DutyStartDate = DutyRules.ValidateStartDate(request.DutyStartDate);
+
             var person = _context.People.AsNoTracking().FirstOrDefault(z => z.Name == request.Name);
 
             if (person is null) throw new BadHttpRequestException($"No person named '{request.Name}' exists.", StatusCodes.Status404NotFound);
