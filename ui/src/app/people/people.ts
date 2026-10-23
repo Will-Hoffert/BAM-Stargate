@@ -6,10 +6,12 @@ import { MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 import { errorMessage } from '../api/api-error';
 import { Person } from '../api/api-models';
 import { StargateApi } from '../api/stargate-api';
 import { PersonStatus, personStatus } from './person-status';
+import { StatusPill } from './status-pill/status-pill';
 
 interface PersonRow extends Person {
   status: PersonStatus;
@@ -31,6 +33,8 @@ const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: tr
     MatLabel,
     MatSortModule,
     MatTableModule,
+    RouterLink,
+    StatusPill,
   ],
   selector: 'app-people',
   styleUrl: './people.scss',

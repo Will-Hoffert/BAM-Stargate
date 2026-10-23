@@ -23,22 +23,7 @@ td {
   padding: 16px;
 }
 
-.status {
-  display: inline-block;
-  padding: 2px 12px;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: var(--mat-sys-corner-small);
-  color: var(--mat-sys-on-surface-variant);
-  font: var(--mat-sys-label-large);
-
-  &.active {
-    border-color: transparent;
-    background-color: var(--mat-sys-primary-container);
-    color: var(--mat-sys-on-primary-container);
-  }
-
-  &.retired {
-    border-color: transparent;
-    background-color: var(--mat-sys-surface-container-highest);
-  }
+.person-link {
+  color: var(--mat-sys-primary);
+  font-weight: 500;
 }

@@ -27,19 +27,14 @@
       >
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-          <td mat-cell *matCellDef="let person">{{ person.name }}</td>
+          <td mat-cell *matCellDef="let person">
+            <a class="person-link" [routerLink]="['/people', person.name]">{{ person.name }}</a>
+          </td>
         </ng-container>
 
         <ng-container matColumnDef="status">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
-          <td mat-cell *matCellDef="let person">
-            <span
-              class="status"
-              [class.active]="person.status === 'Active'"
-              [class.retired]="person.status === 'Retired'"
-              >{{ person.status }}</span
-            >
-          </td>
+          <td mat-cell *matCellDef="let person"><app-status-pill [status]="person.status" /></td>
         </ng-container>
 
         <ng-container matColumnDef="currentRank">

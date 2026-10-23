@@ -10,5 +10,10 @@ export const routes: Routes = [
     loadComponent: () => import('./people/people').then((m) => m.People),
     title: 'Possible Astronauts – Stargate ACTS',
   },
+  {
+    path: 'people/:name',
+    loadComponent: () => import('./person-timeline/person-timeline').then((m) => m.PersonTimeline),
+    title: (route) => `${route.paramMap.get('name')} – Stargate ACTS`,
+  },
   { path: '**', component: NotFound, title: 'Page not found – Stargate ACTS' },
 ];

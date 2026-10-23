@@ -1,0 +1,67 @@
+<a class="back" matButton routerLink="/people">← Possible Astronauts</a>
+
+@if (career.error(); as error) {
+  <div class="problem" role="alert">
+    <p>{{ errorMessage(error) }}</p>
+    @if (isNotFound(error)) {
+      <a matButton="filled" routerLink="/people">Back to Possible Astronauts</a>
+    } @else {
+      <button matButton="filled" (click)="career.reload()">Try again</button>
+    }
+  </div>
+} @else if (career.hasValue()) {
+  @let person = career.value().person;
+  <div class="heading">
+    <h1>{{ person.name }}</h1>
+    @if (status(); as status) {
+      <app-status-pill [status]="status" />
+    }
+  </div>
+
+  @if (person.careerStartDate) {
+    <dl>
+      <dt>Current rank</dt>
+      <dd>{{ person.currentRank }}</dd>
+      <dt>Current duty title</dt>
+      <dd>{{ person.currentDutyTitle }}</dd>
+      <dt>Career start</dt>
+      <dd>{{ person.careerStartDate | date }}</dd>
+      @if (person.careerEndDate) {
+        <dt>Career end</dt>
+        <dd>{{ person.careerEndDate | date }}</dd>
+      }
+      <dt>Career length</dt>
+      <dd>{{ careerLength() }}</dd>
+    </dl>
+  }
+
+  <h2>Duties</h2>
+  @if (entries().length === 0) {
+    <p>No duties yet.</p>
+  } @else {
+    <ol class="timeline">
+      @for (entry of entries(); track entry.id) {
+        @if (entry.kind === 'retirement') {
+          <li class="retirement">
+            <p class="duty"><strong>Retired</strong></p>
+            <p class="when">{{ entry.dutyStartDate | date }}</p>
+          </li>
+        } @else {
+          <li [class.current]="entry.kind === 'current'">
+            @if (entry.kind === 'current') {
+              <span class="label">Current</span>
+            }
+            <p class="duty">
+              <strong>{{ entry.dutyTitle }}</strong> · {{ entry.rank }}
+            </p>
+            <p class="when">
+              {{ entry.dutyStartDate | date }} –
+              {{ entry.dutyEndDate ? (entry.dutyEndDate | date) : 'present' }} ·
+              {{ entry.duration }}
+            </p>
+          </li>
+        }
+      }
+    </ol>
+  }
+}

@@ -5,6 +5,7 @@ import { MatButtonHarness } from '@angular/material/button/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
 import { MatSortHarness } from '@angular/material/sort/testing';
 import { MatTableHarness } from '@angular/material/table/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { ApiError } from '../api/api-error';
 import { Person } from '../api/api-models';
@@ -41,7 +42,7 @@ const newcomer: Person = {
 function configure(getPeople: () => Observable<Person[]>) {
   TestBed.configureTestingModule({
     imports: [People],
-    providers: [{ provide: StargateApi, useValue: { getPeople } }],
+    providers: [provideRouter([]), { provide: StargateApi, useValue: { getPeople } }],
   });
 }
 
@@ -74,6 +75,13 @@ describe('People', () => {
       label: 'Name',
     });
     expect(await nameHeader.getSortDirection()).toBe('asc');
+  });
+
+  it("should link each name to that person's timeline", async () => {
+    const { element } = await render(() => of([commander, retiree, newcomer]));
+
+    const links = [...element.querySelectorAll('td a')].map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['/people/Amy%20Ray', '/people/John%20Doe', '/people/Zed%20Park']);
   });
 
   it('should show career dates as the calendar dates they are', async () => {

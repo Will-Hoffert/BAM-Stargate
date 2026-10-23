@@ -1,17 +1,33 @@
 import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
-import { Router, provideRouter } from '@angular/router';
+import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of } from 'rxjs';
+import { PersonDuties } from './api/api-models';
 import { StargateApi } from './api/stargate-api';
 import { routes } from './app.routes';
+
+const johnDoe: PersonDuties = {
+  person: {
+    personId: 1,
+    name: 'John Doe',
+    currentRank: null,
+    currentDutyTitle: null,
+    careerStartDate: null,
+    careerEndDate: null,
+  },
+  duties: [],
+};
 
 describe('routes', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        provideRouter(routes),
-        { provide: StargateApi, useValue: { getPeople: () => of([]) } },
+        provideRouter(routes, withComponentInputBinding()),
+        {
+          provide: StargateApi,
+          useValue: { getPeople: () => of([]), getDuties: () => of(johnDoe) },
+        },
       ],
     });
   });
@@ -38,5 +54,12 @@ describe('routes', () => {
       'Possible Astronauts',
     );
     expect(TestBed.inject(Title).getTitle()).toBe('Possible Astronauts – Stargate ACTS');
+  });
+
+  it("should open a person's timeline from their URL, titled with their name", async () => {
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/people/John%20Doe');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent).toBe('John Doe');
+    expect(TestBed.inject(Title).getTitle()).toBe('John Doe – Stargate ACTS');
   });
 });
