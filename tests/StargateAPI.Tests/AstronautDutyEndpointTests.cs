@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using StargateAPI.Business.Commands;
@@ -108,6 +109,22 @@ namespace StargateAPI.Tests
                     Assert.Equal("Pilot", duty.DutyTitle);
                     Assert.Equal(new DateTime(2021, 5, 31), duty.DutyEndDate);
                 });
+        }
+
+        [Fact]
+        public async Task GetAstronautDutiesByName_PersonWithDuty_ReturnsOnlyDutyFields()
+        {
+            await CreatePersonAsync("Duty Shape Person");
+            await AddDutyAsync("Duty Shape Person", "2LT", "Navigator", new DateTime(2017, 4, 1));
+
+            var response = await _client.GetAsync($"/AstronautDuty/{Uri.EscapeDataString("Duty Shape Person")}");
+
+            response.EnsureSuccessStatusCode();
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var duty = Assert.Single(json.RootElement.GetProperty("astronautDuties").EnumerateArray());
+            Assert.Equal(
+                new HashSet<string> { "id", "rank", "dutyTitle", "dutyStartDate", "dutyEndDate" },
+                duty.EnumerateObject().Select(p => p.Name).ToHashSet());
         }
 
         [Fact]
