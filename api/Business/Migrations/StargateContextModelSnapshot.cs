@@ -90,6 +90,9 @@ namespace StargateAPI.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique();
+
                     b.ToTable("Person");
                 });
 

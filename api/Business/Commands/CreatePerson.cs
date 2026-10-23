@@ -46,7 +46,15 @@ namespace StargateAPI.Business.Commands
 
                 await _context.People.AddAsync(newPerson);
 
-                await _context.SaveChangesAsync();
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+                {
+                    // Another request saved this name after CreatePersonPreProcessor checked it.
+                    throw new BadHttpRequestException($"A person named '{request.Name}' already exists.", StatusCodes.Status409Conflict, ex);
+                }
 
                 return new CreatePersonResult()
                 {
