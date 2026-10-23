@@ -1,6 +1,8 @@
 using MediatR.Pipeline;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StargateAPI.Business.Data;
+using StargateAPI.Controllers;
 using StargateAPI.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +28,26 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 // .NET 8's UseExceptionHandler() won't start without a ProblemDetails service, even with an IExceptionHandler registered.
 builder.Services.AddProblemDetails();
+
+// [ApiController] answers a body it can't bind with its own ProblemDetails 400 before the action runs.
+// Send that 400 in the BaseResponse envelope like every other error, using ASP.NET's messages.
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var message = string.Join(" ", context.ModelState.Values
+            .SelectMany(v => v.Errors)
+            .Select(e => e.ErrorMessage)
+            .Where(m => !string.IsNullOrWhiteSpace(m)));
+
+        return new BadRequestObjectResult(new BaseResponse
+        {
+            Success = false,
+            Message = message.Length > 0 ? message : "The request is invalid.",
+            ResponseCode = StatusCodes.Status400BadRequest
+        });
+    };
+});
 
 var app = builder.Build();
 

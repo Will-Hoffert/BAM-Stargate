@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using StargateAPI.Business.Data;
@@ -16,6 +18,27 @@ namespace StargateAPI.Tests
         public ExceptionHandlingTests(StargateApiFactory factory)
         {
             _client = factory.CreateClient();
+        }
+
+        [Fact]
+        public async Task CreatePerson_NullName_ReturnsBadRequestEnvelope()
+        {
+            // ASP.NET rejects a body it can't bind before the controller action runs.
+            var response = await _client.PostAsync("/Person", new StringContent("null", Encoding.UTF8, "application/json"));
+
+            var body = await AssertBadRequestEnvelopeAsync(response);
+            Assert.Contains("A non-empty request body is required.", body.Message);
+        }
+
+        [Fact]
+        public async Task CreateAstronautDuty_InvalidDate_ReturnsBadRequestEnvelope()
+        {
+            var json = """{ "name": "Anyone", "rank": "CPT", "dutyTitle": "Pilot", "dutyStartDate": "not a date" }""";
+
+            var response = await _client.PostAsync("/AstronautDuty", new StringContent(json, Encoding.UTF8, "application/json"));
+
+            var body = await AssertBadRequestEnvelopeAsync(response);
+            Assert.Contains("$.dutyStartDate", body.Message);
         }
 
         [Fact]
@@ -39,6 +62,21 @@ namespace StargateAPI.Tests
             Assert.Equal((int)HttpStatusCode.InternalServerError, body.ResponseCode);
             Assert.DoesNotContain("SQLite", body.Message);
             Assert.DoesNotContain("AstronautDetail", body.Message);
+        }
+
+        private static async Task<BaseResponse> AssertBadRequestEnvelopeAsync(HttpResponseMessage response)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var json = await response.Content.ReadAsStringAsync();
+            using var document = JsonDocument.Parse(json);
+            // Checked on the raw JSON, because any body would deserialize into BaseResponse's defaults.
+            Assert.True(document.RootElement.TryGetProperty("success", out _), $"Not a BaseResponse: {json}");
+
+            var body = JsonSerializer.Deserialize<BaseResponse>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Assert.NotNull(body);
+            Assert.False(body.Success);
+            Assert.Equal((int)HttpStatusCode.BadRequest, body.ResponseCode);
+            return body;
         }
     }
 }
