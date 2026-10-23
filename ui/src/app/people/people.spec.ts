@@ -2,10 +2,12 @@ import { HarnessLoader } from '@angular/cdk/testing';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { TestBed } from '@angular/core/testing';
 import { MatButtonHarness } from '@angular/material/button/testing';
+import { MATERIAL_ANIMATIONS } from '@angular/material/core';
+import { MatDialogHarness } from '@angular/material/dialog/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
 import { MatSortHarness } from '@angular/material/sort/testing';
 import { MatTableHarness } from '@angular/material/table/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { ApiError } from '../api/api-error';
 import { Person } from '../api/api-models';
@@ -39,20 +41,33 @@ const newcomer: Person = {
   careerEndDate: null,
 };
 
-function configure(getPeople: () => Observable<Person[]>) {
+function configure(
+  getPeople: () => Observable<Person[]>,
+  createPerson: (name: string) => Observable<number> = () => of(1),
+) {
   TestBed.configureTestingModule({
     imports: [People],
-    providers: [provideRouter([]), { provide: StargateApi, useValue: { getPeople } }],
+    providers: [
+      provideRouter([{ path: 'people/:name', children: [] }]),
+      { provide: StargateApi, useValue: { getPeople, createPerson } },
+      // Without animations a dialog closes straight away, so tests don't wait on a timer.
+      { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
+    ],
   });
 }
 
-async function render(getPeople: () => Observable<Person[]>) {
-  configure(getPeople);
+async function render(
+  getPeople: () => Observable<Person[]>,
+  createPerson?: (name: string) => Observable<number>,
+) {
+  configure(getPeople, createPerson);
   const fixture = TestBed.createComponent(People);
   await fixture.whenStable();
   return {
     element: fixture.nativeElement as HTMLElement,
     loader: TestbedHarnessEnvironment.loader(fixture),
+    // Dialogs open outside the page's own element.
+    documentLoader: TestbedHarnessEnvironment.documentRootLoader(fixture),
   };
 }
 
@@ -143,6 +158,22 @@ describe('People', () => {
 
     expect(element.textContent).toContain('No people yet.');
     expect(await loader.getHarnessOrNull(MatTableHarness)).toBeNull();
+    expect(
+      await loader.getHarnessOrNull(MatButtonHarness.with({ text: 'New person' })),
+    ).not.toBeNull();
+  });
+
+  it('should add a person and open their timeline', async () => {
+    const createPerson = vi.fn(() => of(4));
+    const { loader, documentLoader } = await render(() => of([commander]), createPerson);
+
+    await (await loader.getHarness(MatButtonHarness.with({ text: 'New person' }))).click();
+    const dialog = await documentLoader.getHarness(MatDialogHarness);
+    await (await dialog.getHarness(MatInputHarness)).setValue('Jane Doe');
+    await (await dialog.getHarness(MatButtonHarness.with({ text: 'Save' }))).click();
+
+    expect(createPerson).toHaveBeenCalledWith('Jane Doe');
+    expect(TestBed.inject(Router).url).toBe('/people/Jane%20Doe');
   });
 
   // A resource that is still loading keeps the fixture from becoming stable, so this test

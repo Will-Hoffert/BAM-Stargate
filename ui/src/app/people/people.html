@@ -1,4 +1,7 @@
-<h1>Possible Astronauts</h1>
+<div class="heading">
+  <h1>Possible Astronauts</h1>
+  <button matButton="filled" (click)="addPerson()">New person</button>
+</div>
 
 @if (people.error(); as error) {
   <div class="problem" role="alert">

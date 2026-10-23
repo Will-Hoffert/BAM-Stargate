@@ -2,14 +2,16 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { MatButton } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { errorMessage } from '../api/api-error';
 import { Person } from '../api/api-models';
 import { StargateApi } from '../api/stargate-api';
+import { NewPersonDialog } from './new-person-dialog/new-person-dialog';
 import { PersonStatus, personStatus } from './person-status';
 import { StatusPill } from './status-pill/status-pill';
 
@@ -42,6 +44,8 @@ const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: tr
 })
 export class People {
   private readonly api = inject(StargateApi);
+  private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
 
   protected readonly columns: Column[] = [
     'name',
@@ -66,6 +70,16 @@ export class People {
       .filter((row) => matches(row, term));
     return sortRows(rows, this.sort());
   });
+
+  // A new person's next step is their first duty, which is added on their timeline.
+  protected addPerson(): void {
+    this.dialog
+      .open<NewPersonDialog, void, string>(NewPersonDialog, { width: '400px' })
+      .afterClosed()
+      .subscribe((name) => {
+        if (name !== undefined) void this.router.navigate(['/people', name]);
+      });
+  }
 }
 
 function matches(row: PersonRow, term: string): boolean {
