@@ -57,6 +57,20 @@ namespace StargateAPI.Tests
         }
 
         [Fact]
+        public async Task UpdatePerson_CancelledRequest_ThrowsAndKeepsName()
+        {
+            await CreatePersonAsync("Cancelled Rename Person");
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var controller = new PersonController(scope.ServiceProvider.GetRequiredService<IMediator>());
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => controller.UpdatePerson("Cancelled Rename Person", "Cancelled Renamed Person", CancelledToken));
+            }
+
+            Assert.True(await PersonExistsAsync("Cancelled Rename Person"));
+        }
+
+        [Fact]
         public async Task GetAstronautDutiesByName_CancelledRequest_Throws()
         {
             await CreatePersonAsync("Cancelled Duties Person");
@@ -92,6 +106,16 @@ namespace StargateAPI.Tests
         }
 
         [Fact]
+        public async Task UpdatePersonPreProcessor_CancelledToken_Throws()
+        {
+            await CreatePersonAsync("Cancelled Rename Check Person");
+            using var scope = _factory.Services.CreateScope();
+            var preProcessor = new UpdatePersonPreProcessor(scope.ServiceProvider.GetRequiredService<StargateContext>());
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => preProcessor.Process(new UpdatePerson { Name = "Cancelled Rename Check Person", NewName = "Cancelled Rename Check Person Later" }, CancelledToken));
+        }
+
+        [Fact]
         public async Task CreateAstronautDutyPreProcessor_CancelledToken_Throws()
         {
             await CreatePersonAsync("Cancelled Duty Check Person");
@@ -113,6 +137,21 @@ namespace StargateAPI.Tests
             }
 
             Assert.False(await PersonExistsAsync("Cancelled Save Person"));
+        }
+
+        [Fact]
+        public async Task UpdatePersonHandler_CancelledToken_KeepsName()
+        {
+            // UpdatePersonPreProcessor would stop a cancelled request first, so the handler is called directly.
+            await CreatePersonAsync("Cancelled Rename Save Person");
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var handler = new UpdatePersonHandler(scope.ServiceProvider.GetRequiredService<StargateContext>());
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.Handle(new UpdatePerson { Name = "Cancelled Rename Save Person", NewName = "Cancelled Renamed Save Person" }, CancelledToken));
+            }
+
+            Assert.True(await PersonExistsAsync("Cancelled Rename Save Person"));
         }
 
         private async Task CreatePersonAsync(string name)

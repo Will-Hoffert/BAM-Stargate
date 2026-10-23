@@ -31,6 +31,15 @@ namespace StargateAPI.Tests
         }
 
         [Fact]
+        public async Task UpdatePerson_NullNewName_ReturnsBadRequestEnvelope()
+        {
+            var response = await _client.PutAsync($"/Person/{Uri.EscapeDataString("Anyone")}", new StringContent("null", Encoding.UTF8, "application/json"));
+
+            var body = await AssertBadRequestEnvelopeAsync(response);
+            Assert.Contains("A non-empty request body is required.", body.Message);
+        }
+
+        [Fact]
         public async Task CreateAstronautDuty_InvalidDate_ReturnsBadRequestEnvelope()
         {
             var json = """{ "name": "Anyone", "rank": "CPT", "dutyTitle": "Pilot", "dutyStartDate": "not a date" }""";
