@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormField, FormRoot, form, validate } from '@angular/forms/signals';
 import { MatButton } from '@angular/material/button';
 import {
+  MAT_DIALOG_DATA,
   MatDialogActions,
   MatDialogContent,
   MatDialogRef,
@@ -9,12 +10,23 @@ import {
 } from '@angular/material/dialog';
 import { MatError, MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { ApiError, errorMessage } from '../../api/api-error';
-import { StargateApi } from '../../api/stargate-api';
 import { maxNameLength, nameError } from '../person-rules';
 
-/** Asks for a new person's name and creates them. Closes with the name that was saved. */
+export interface PersonNameData {
+  /** For example "New person" or "Rename John Doe". */
+  title: string;
+  /** The name to start from: empty for a new person, the current name for a rename. */
+  name: string;
+  /** Saves the trimmed name. A failure is an ApiError. */
+  save: (name: string) => Observable<unknown>;
+}
+
+/**
+ * Asks for a person's name, for a new person or a rename, using the API's name rules.
+ * Closes with the saved name, or with nothing when cancelled or left unchanged.
+ */
 @Component({
   imports: [
     FormField,
@@ -29,19 +41,19 @@ import { maxNameLength, nameError } from '../person-rules';
     MatInput,
     MatLabel,
   ],
-  selector: 'app-new-person-dialog',
-  styleUrl: './new-person-dialog.scss',
-  templateUrl: './new-person-dialog.html',
+  selector: 'app-person-name-dialog',
+  styleUrl: './person-name-dialog.scss',
+  templateUrl: './person-name-dialog.html',
 })
-export class NewPersonDialog {
-  private readonly api = inject(StargateApi);
-  private readonly dialogRef = inject<MatDialogRef<NewPersonDialog, string>>(MatDialogRef);
+export class PersonNameDialog {
+  private readonly dialogRef = inject<MatDialogRef<PersonNameDialog, string>>(MatDialogRef);
+  protected readonly data = inject<PersonNameData>(MAT_DIALOG_DATA);
 
   protected readonly maxNameLength = maxNameLength;
   protected readonly problem = signal<string | null>(null);
 
   protected readonly person = form(
-    signal({ name: '' }),
+    signal({ name: this.data.name }),
     (person) => {
       validate(person.name, ({ value }) => {
         const message = nameError(value());
@@ -53,8 +65,13 @@ export class NewPersonDialog {
         action: async (person) => {
           this.problem.set(null);
           const name = person.name().value().trim();
+          // Renaming someone to exactly the name they have changes nothing.
+          if (name === this.data.name) {
+            this.dialogRef.close();
+            return undefined;
+          }
           try {
-            await firstValueFrom(this.api.createPerson(name));
+            await firstValueFrom(this.data.save(name));
           } catch (error) {
             // A taken name is for the user to fix, so it shows under the field.
             if (error instanceof ApiError && error.status === 409) {

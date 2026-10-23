@@ -8,18 +8,27 @@ import { MatFormFieldHarness } from '@angular/material/form-field/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
 import { Observable, Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { ApiError } from '../../api/api-error';
-import { StargateApi } from '../../api/stargate-api';
-import { NewPersonDialog } from './new-person-dialog';
+import { PersonNameData, PersonNameDialog } from './person-name-dialog';
 
 @Component({ template: '' })
 class Host {}
 
-async function open(createPerson: (name: string) => Observable<number>) {
-  TestBed.configureTestingModule({
-    providers: [{ provide: StargateApi, useValue: { createPerson } }],
-  });
+/** The dialog as Possible Astronauts opens it. */
+function open(createPerson: (name: string) => Observable<unknown>) {
+  return openWith({ title: 'New person', name: '', save: createPerson });
+}
+
+/** The dialog as John Doe's timeline opens it. */
+function openRename(renamePerson: (newName: string) => Observable<unknown>) {
+  return openWith({ title: 'Rename John Doe', name: 'John Doe', save: renamePerson });
+}
+
+async function openWith(data: PersonNameData) {
   const fixture = TestBed.createComponent(Host);
-  const dialogRef = TestBed.inject(MatDialog).open<NewPersonDialog, void, string>(NewPersonDialog);
+  const dialogRef = TestBed.inject(MatDialog).open<PersonNameDialog, PersonNameData, string>(
+    PersonNameDialog,
+    { data },
+  );
   const closed = firstValueFrom(dialogRef.afterClosed());
   const loader = TestbedHarnessEnvironment.documentRootLoader(fixture);
   const dialog = await loader.getHarness(MatDialogHarness);
@@ -34,7 +43,7 @@ async function open(createPerson: (name: string) => Observable<number>) {
   };
 }
 
-describe('NewPersonDialog', () => {
+describe('PersonNameDialog for a new person', () => {
   it('should be titled New person', async () => {
     const { dialog } = await open(() => of(1));
     expect(await dialog.getTitleText()).toBe('New person');
@@ -142,5 +151,63 @@ describe('NewPersonDialog', () => {
 
     expect(await closed).toBeUndefined();
     expect(createPerson).not.toHaveBeenCalled();
+  });
+});
+
+describe('PersonNameDialog for a rename', () => {
+  it('should start from the current name, selected so it can be typed over', async () => {
+    const { dialog, name } = await openRename(() => of(1));
+
+    expect(await dialog.getTitleText()).toBe('Rename John Doe');
+    expect(await name.getValue()).toBe('John Doe');
+    await name.focus();
+    const input = await name.host();
+    expect(await input.getProperty<number>('selectionStart')).toBe(0);
+    expect(await input.getProperty<number>('selectionEnd')).toBe('John Doe'.length);
+  });
+
+  it('should save the new name trimmed, and close with it', async () => {
+    const renamePerson = vi.fn(() => of(1));
+    const { name, save, closed } = await openRename(renamePerson);
+
+    await name.setValue('  Jane Doe ');
+    await save.click();
+
+    expect(renamePerson).toHaveBeenCalledWith('Jane Doe');
+    expect(await closed).toBe('Jane Doe');
+  });
+
+  it('should close without saving when the name is unchanged', async () => {
+    const renamePerson = vi.fn(() => of(1));
+    const { name, save, closed } = await openRename(renamePerson);
+
+    await name.setValue(' John Doe ');
+    await save.click();
+
+    expect(await closed).toBeUndefined();
+    expect(renamePerson).not.toHaveBeenCalled();
+  });
+
+  it('should save a change of case, which the API allows', async () => {
+    const renamePerson = vi.fn(() => of(1));
+    const { name, save, closed } = await openRename(renamePerson);
+
+    await name.setValue('john doe');
+    await save.click();
+
+    expect(renamePerson).toHaveBeenCalledWith('john doe');
+    expect(await closed).toBe('john doe');
+  });
+
+  it('should say so when someone else renamed them first', async () => {
+    const { dialog, name, save, isOpen } = await openRename(() =>
+      throwError(() => new ApiError(404, "No person named 'John Doe' exists.")),
+    );
+
+    await name.setValue('Jane Doe');
+    await save.click();
+
+    expect(await dialog.getContentText()).toContain("No person named 'John Doe' exists.");
+    expect(isOpen()).toBe(true);
   });
 });

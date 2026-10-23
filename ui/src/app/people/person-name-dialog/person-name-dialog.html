@@ -1,10 +1,17 @@
-<h2 mat-dialog-title>New person</h2>
+<h2 mat-dialog-title>{{ data.title }}</h2>
 <form [formRoot]="person">
   <mat-dialog-content>
     <mat-form-field class="name" appearance="outline">
       <mat-label>Name</mat-label>
-      <!-- Someone else's name, so the browser shouldn't offer the user's own. -->
-      <input matInput [formField]="person.name" autocomplete="off" />
+      <!-- Someone else's name, so the browser shouldn't offer the user's own. Selected on focus,
+           so a rename can type straight over the current name. -->
+      <input
+        matInput
+        #nameInput
+        [formField]="person.name"
+        autocomplete="off"
+        (focus)="nameInput.select()"
+      />
       <mat-hint align="end"
         >{{ person.name().value().trim().length }} / {{ maxNameLength }}</mat-hint
       >

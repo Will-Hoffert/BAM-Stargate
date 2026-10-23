@@ -11,7 +11,7 @@ import { Router, RouterLink } from '@angular/router';
 import { errorMessage } from '../api/api-error';
 import { Person } from '../api/api-models';
 import { StargateApi } from '../api/stargate-api';
-import { NewPersonDialog } from './new-person-dialog/new-person-dialog';
+import { PersonNameData, PersonNameDialog } from './person-name-dialog/person-name-dialog';
 import { PersonStatus, personStatus } from './person-status';
 import { StatusPill } from './status-pill/status-pill';
 
@@ -74,7 +74,10 @@ export class People {
   // A new person's next step is their first duty, which is added on their timeline.
   protected addPerson(): void {
     this.dialog
-      .open<NewPersonDialog, void, string>(NewPersonDialog, { width: '400px' })
+      .open<PersonNameDialog, PersonNameData, string>(PersonNameDialog, {
+        width: '400px',
+        data: { title: 'New person', name: '', save: (name) => this.api.createPerson(name) },
+      })
       .afterClosed()
       .subscribe((name) => {
         if (name !== undefined) void this.router.navigate(['/people', name]);

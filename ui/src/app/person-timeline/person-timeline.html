@@ -16,6 +16,7 @@
     @if (status(); as status) {
       <app-status-pill [status]="status" />
     }
+    <button matButton="outlined" (click)="rename()">Rename</button>
   </div>
 
   @if (person.careerStartDate) {

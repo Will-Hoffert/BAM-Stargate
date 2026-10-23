@@ -3,11 +3,12 @@ import { Component, computed, inject, input } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { MatButton } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { toApiDate } from '../api/api-dates';
 import { ApiError, errorMessage } from '../api/api-error';
 import { AstronautDuty, IsoDate } from '../api/api-models';
 import { StargateApi } from '../api/stargate-api';
+import { PersonNameData, PersonNameDialog } from '../people/person-name-dialog/person-name-dialog';
 import { personStatus } from '../people/person-status';
 import { StatusPill } from '../people/status-pill/status-pill';
 import { isRetirement } from './duty-rules';
@@ -28,6 +29,7 @@ interface TimelineEntry extends AstronautDuty {
 export class PersonTimeline {
   private readonly api = inject(StargateApi);
   private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
 
   /** From the URL, e.g. /people/John%20Doe. */
   readonly name = input.required<string>();
@@ -72,6 +74,27 @@ export class PersonTimeline {
 
   protected isNotFound(error: Error): boolean {
     return error instanceof ApiError && error.status === 404;
+  }
+
+  protected rename(): void {
+    if (!this.career.hasValue()) return;
+    const name = this.career.value().person.name;
+    this.dialog
+      .open<PersonNameDialog, PersonNameData, string>(PersonNameDialog, {
+        width: '400px',
+        data: {
+          title: `Rename ${name}`,
+          name,
+          save: (newName) => this.api.renamePerson(name, newName),
+        },
+      })
+      .afterClosed()
+      .subscribe((newName) => {
+        // The old address no longer exists, so it's replaced in the history and Back skips it.
+        if (newName !== undefined) {
+          void this.router.navigate(['/people', newName], { replaceUrl: true });
+        }
+      });
   }
 
   protected addDuty(): void {

@@ -6,7 +6,7 @@ import { MatDatepickerInputHarness } from '@angular/material/datepicker/testing'
 import { MatDialogHarness } from '@angular/material/dialog/testing';
 import { MatFormFieldHarness } from '@angular/material/form-field/testing';
 import { MatInputHarness } from '@angular/material/input/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 import { ApiError } from '../api/api-error';
 import { NewDuty, Person, PersonDuties } from '../api/api-models';
@@ -61,12 +61,13 @@ async function render(
   name: string,
   getDuties: (name: string) => Observable<PersonDuties>,
   addDuty: (duty: NewDuty) => Observable<number> = () => of(1),
+  renamePerson: (name: string, newName: string) => Observable<number> = () => of(1),
 ) {
   TestBed.configureTestingModule({
     imports: [PersonTimeline],
     providers: [
       provideRouter([]),
-      { provide: StargateApi, useValue: { getDuties, addDuty } },
+      { provide: StargateApi, useValue: { getDuties, addDuty, renamePerson } },
       // Without animations a dialog closes straight away, so tests don't wait on a timer.
       { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
     ],
@@ -181,6 +182,27 @@ describe('PersonTimeline', () => {
     expect(element.textContent).toContain('No duties yet.');
     expect(facts(element)).toEqual({});
     expect(entries(element)).toEqual([]);
+  });
+
+  it('should rename the person and replace the old address in the history', async () => {
+    const renamePerson = vi.fn(() => of(1));
+    const { loader, documentLoader } = await render(
+      'John Doe',
+      () => of(activeCareer),
+      undefined,
+      renamePerson,
+    );
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    await (await loader.getHarness(MatButtonHarness.with({ text: 'Rename' }))).click();
+    const dialog = await documentLoader.getHarness(MatDialogHarness);
+    expect(await dialog.getTitleText()).toBe('Rename John Doe');
+    await (await dialog.getHarness(MatInputHarness)).setValue('Jane Doe');
+    await (await dialog.getHarness(MatButtonHarness.with({ text: 'Save' }))).click();
+
+    expect(renamePerson).toHaveBeenCalledWith('John Doe', 'Jane Doe');
+    // The old address no longer exists, so Back shouldn't lead to it.
+    expect(navigate).toHaveBeenCalledWith(['/people', 'Jane Doe'], { replaceUrl: true });
   });
 
   it('should offer Add duty to someone who has not retired', async () => {
