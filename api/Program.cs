@@ -18,6 +18,8 @@ builder.Services.AddDbContext<StargateContext>(options =>
 
 builder.Services.AddMediatR(cfg =>
 {
+    // Behaviors run in the order they are added. Logging comes first so it also records requests the pre-processors reject.
+    cfg.AddOpenBehavior(typeof(ProcessLoggingBehavior<,>));
     // MediatR 12 skips pre-processors during assembly scanning unless asked, which left CreatePersonPreProcessor unregistered.
     // AutoRegisterRequestProcessors registers every pre-processor, but not the behavior that runs them, so add that too.
     cfg.AutoRegisterRequestProcessors = true;

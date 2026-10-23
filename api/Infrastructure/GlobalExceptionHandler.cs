@@ -9,6 +9,9 @@ namespace StargateAPI.Infrastructure
     // so the response only tells the caller what they need to know.
     public class GlobalExceptionHandler : IExceptionHandler
     {
+        // ProcessLoggingBehavior records this same text, so the log shows what the caller was told.
+        public const string UnexpectedErrorMessage = "An unexpected error occurred.";
+
         public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
         {
             var response = exception switch
@@ -23,7 +26,7 @@ namespace StargateAPI.Infrastructure
                 _ => new BaseResponse
                 {
                     Success = false,
-                    Message = "An unexpected error occurred.",
+                    Message = UnexpectedErrorMessage,
                     ResponseCode = (int)HttpStatusCode.InternalServerError
                 }
             };
