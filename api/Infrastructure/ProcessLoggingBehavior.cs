@@ -26,6 +26,9 @@ namespace StargateAPI.Infrastructure
 
         public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
         {
+            // Reading the log, for one: logging it would add an entry on every refresh of a log view.
+            if (request is ISkipProcessLogging) return await next();
+
             // Taken before the pre-processors write cleaned values back into the request, so it shows what the caller sent.
             var requestJson = SerializeRequest(request);
             var stopwatch = Stopwatch.StartNew();

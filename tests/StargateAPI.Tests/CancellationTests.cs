@@ -71,6 +71,15 @@ namespace StargateAPI.Tests
         }
 
         [Fact]
+        public async Task GetProcessLog_CancelledRequest_Throws()
+        {
+            using var scope = _factory.Services.CreateScope();
+            var controller = new ProcessLogController(scope.ServiceProvider.GetRequiredService<IMediator>());
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => controller.GetProcessLog(null, CancelledToken));
+        }
+
+        [Fact]
         public async Task GetAstronautDutiesByName_CancelledRequest_Throws()
         {
             await CreatePersonAsync("Cancelled Duties Person");
