@@ -18,7 +18,7 @@ namespace StargateAPI.Controllers
         [HttpGet("{name}")]
         public async Task<IActionResult> GetAstronautDutiesByName(string name)
         {
-            var result = await _mediator.Send(new GetPersonByName()
+            var result = await _mediator.Send(new GetAstronautDutiesByName()
             {
                 Name = name
             });

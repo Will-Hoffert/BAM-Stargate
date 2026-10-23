@@ -1,11 +1,11 @@
+using System.Net;
 using System.Net.Http.Json;
-using MediatR;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using StargateAPI.Business.Commands;
 using StargateAPI.Business.Data;
 using StargateAPI.Business.Queries;
+using StargateAPI.Controllers;
 
 namespace StargateAPI.Tests
 {
@@ -85,16 +85,41 @@ namespace StargateAPI.Tests
         }
 
         [Fact]
-        public async Task GetAstronautDutiesByName_UnknownPerson_ThrowsNotFound()
+        public async Task GetAstronautDutiesByName_PersonWithDuties_ReturnsDutiesNewestFirst()
         {
-            // Sent through MediatR directly: GET /AstronautDuty/{name} does not dispatch this query yet.
-            using var scope = _factory.Services.CreateScope();
-            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+            await CreatePersonAsync("Duty History Person");
+            await AddDutyAsync("Duty History Person", "1LT", "Pilot", new DateTime(2019, 1, 1));
+            await AddDutyAsync("Duty History Person", "CPT", "Commander", new DateTime(2021, 6, 1));
 
-            var exception = await Assert.ThrowsAsync<BadHttpRequestException>(
-                () => mediator.Send(new GetAstronautDutiesByName { Name = "Nobody By This Name" }));
+            var response = await _client.GetAsync($"/AstronautDuty/{Uri.EscapeDataString("Duty History Person")}");
 
-            Assert.Equal(StatusCodes.Status404NotFound, exception.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<GetAstronautDutiesByNameResult>();
+            Assert.NotNull(body);
+            Assert.Equal("Duty History Person", body.Person.Name);
+            Assert.Collection(body.AstronautDuties,
+                duty =>
+                {
+                    Assert.Equal("Commander", duty.DutyTitle);
+                    Assert.Null(duty.DutyEndDate);
+                },
+                duty =>
+                {
+                    Assert.Equal("Pilot", duty.DutyTitle);
+                    Assert.Equal(new DateTime(2021, 5, 31), duty.DutyEndDate);
+                });
+        }
+
+        [Fact]
+        public async Task GetAstronautDutiesByName_UnknownPerson_ReturnsNotFound()
+        {
+            var response = await _client.GetAsync($"/AstronautDuty/{Uri.EscapeDataString("Nobody By This Name")}");
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.NotNull(body);
+            Assert.False(body.Success);
+            Assert.Equal("No person named 'Nobody By This Name' exists.", body.Message);
         }
 
         private async Task<int> CreatePersonAsync(string name)
