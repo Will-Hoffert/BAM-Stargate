@@ -22,7 +22,7 @@ namespace StargateAPI.Business.Commands
         {
             var person = _context.People.AsNoTracking().FirstOrDefault(z => z.Name == request.Name);
 
-            if (person is not null) throw new BadHttpRequestException("Bad Request");
+            if (person is not null) throw new BadHttpRequestException($"A person named '{request.Name}' already exists.", StatusCodes.Status409Conflict);
 
             return Task.CompletedTask;
         }
