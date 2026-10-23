@@ -19,7 +19,8 @@ namespace StargateAPI.Business.Data
 
         public DateTime? CareerEndDate { get; set; }
 
-        public virtual Person Person { get; set; }
+        // PersonId is required, so this is only null when EF hasn't loaded it.
+        public virtual Person Person { get; set; } = null!;
     }
 
     public class AstronautDetailConfiguration : IEntityTypeConfiguration<AstronautDetail>

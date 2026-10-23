@@ -107,7 +107,7 @@ namespace StargateAPI.Tests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await response.Content.ReadFromJsonAsync<GetAstronautDutiesByNameResult>();
             Assert.NotNull(body);
-            Assert.Equal("Case Duty Person", body.Person.Name);
+            Assert.Equal("Case Duty Person", body.Person?.Name);
             Assert.Single(body.AstronautDuties);
         }
 
@@ -188,7 +188,7 @@ namespace StargateAPI.Tests
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await response.Content.ReadFromJsonAsync<GetAstronautDutiesByNameResult>();
-            Assert.Equal("Spaced Duty Lookup Person", body?.Person.Name);
+            Assert.Equal("Spaced Duty Lookup Person", body?.Person?.Name);
         }
 
         [Theory]

@@ -115,7 +115,7 @@ namespace StargateAPI.Tests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var body = await response.Content.ReadFromJsonAsync<GetAstronautDutiesByNameResult>();
             Assert.NotNull(body);
-            Assert.Equal("Duty History Person", body.Person.Name);
+            Assert.Equal("Duty History Person", body.Person?.Name);
             Assert.Collection(body.AstronautDuties,
                 duty =>
                 {
