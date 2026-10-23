@@ -27,6 +27,8 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssemblies(typeof(Program).Assembly);
 });
 
+builder.Services.AddCors();
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 // .NET 8's UseExceptionHandler() won't start without a ProblemDetails service, even with an IExceptionHandler registered.
 builder.Services.AddProblemDetails();
@@ -63,6 +65,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Lets a browser UI on another origin call the API. Only origins listed in Cors:AllowedOrigins are allowed: none in
+// appsettings.json, the Angular dev server in Development. Methods and headers are only what the API uses.
+app.UseCors(policy => policy
+    .WithOrigins(app.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
+    .WithMethods("GET", "POST", "PUT")
+    .WithHeaders("Content-Type"));
 
 app.UseAuthorization();
 
