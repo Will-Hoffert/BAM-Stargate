@@ -54,6 +54,68 @@ namespace StargateAPI.Tests
             Assert.Equal("A person named 'Racing Person' already exists.", exception.Message);
         }
 
+        [Fact]
+        public async Task CreatePerson_SameNameDifferentCase_ReturnsConflict()
+        {
+            await CreatePersonAsync("Jane Smith");
+
+            var response = await _client.PostAsJsonAsync("/Person", "jane smith");
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task CreatePersonHandler_SameNameDifferentCaseSavedByConcurrentRequest_ThrowsConflict()
+        {
+            await CreatePersonDirectlyAsync("Racing Case Person");
+
+            var exception = await Assert.ThrowsAsync<BadHttpRequestException>(
+                () => CreatePersonDirectlyAsync("racing case person"));
+
+            Assert.Equal(StatusCodes.Status409Conflict, exception.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetPersonByName_DifferentCase_ReturnsPersonAsStored()
+        {
+            await CreatePersonAsync("Case Lookup Person");
+
+            var response = await _client.GetAsync($"/Person/{Uri.EscapeDataString("case lookup person")}");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<GetPersonByNameResult>();
+            Assert.Equal("Case Lookup Person", body?.Person?.Name);
+        }
+
+        [Fact]
+        public async Task AstronautDuty_DifferentCase_AddsAndReturnsDuties()
+        {
+            await CreatePersonAsync("Case Duty Person");
+
+            var dutyResponse = await _client.PostAsJsonAsync("/AstronautDuty", new CreateAstronautDuty
+            {
+                Name = "CASE DUTY PERSON",
+                Rank = "1LT",
+                DutyTitle = "Pilot",
+                DutyStartDate = new DateTime(2016, 2, 1)
+            });
+            Assert.Equal(HttpStatusCode.OK, dutyResponse.StatusCode);
+
+            var response = await _client.GetAsync($"/AstronautDuty/{Uri.EscapeDataString("case duty person")}");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<GetAstronautDutiesByNameResult>();
+            Assert.NotNull(body);
+            Assert.Equal("Case Duty Person", body.Person.Name);
+            Assert.Single(body.AstronautDuties);
+        }
+
+        private async Task CreatePersonAsync(string name)
+        {
+            var response = await _client.PostAsJsonAsync("/Person", name);
+            response.EnsureSuccessStatusCode();
+        }
+
         private async Task CreatePersonDirectlyAsync(string name)
         {
             using var scope = _factory.Services.CreateScope();
