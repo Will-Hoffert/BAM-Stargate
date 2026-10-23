@@ -39,6 +39,14 @@ namespace StargateAPI.Business.Commands
 
             if (verifyNoPreviousDuty is not null) throw new BadHttpRequestException($"'{person.Name}' already has a {request.DutyTitle} duty starting {request.DutyStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.", StatusCodes.Status409Conflict);
 
+            // The handler ends the current duty the day before the new one starts, so the new one has to start later.
+            var currentDuty = _context.AstronautDuties.AsNoTracking()
+                .Where(z => z.PersonId == person.Id)
+                .OrderByDescending(z => z.DutyStartDate)
+                .FirstOrDefault();
+
+            if (currentDuty is not null && request.DutyStartDate.Date <= currentDuty.DutyStartDate) throw new BadHttpRequestException($"A new duty for '{person.Name}' must start after their current duty, which started {currentDuty.DutyStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.", StatusCodes.Status409Conflict);
+
             return Task.CompletedTask;
         }
     }

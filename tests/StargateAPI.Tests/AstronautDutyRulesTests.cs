@@ -65,6 +65,57 @@ namespace StargateAPI.Tests
             Assert.Null(duty.DutyEndDate);
         }
 
+        [Fact]
+        public async Task CreateAstronautDuty_StartsBeforeCurrentDuty_ReturnsConflict()
+        {
+            await CreatePersonAsync("Backdated Duty Person");
+            (await PostDutyAsync("Backdated Duty Person", "Pilot", new DateTime(2020, 1, 1))).EnsureSuccessStatusCode();
+            (await PostDutyAsync("Backdated Duty Person", "Commander", new DateTime(2022, 6, 1))).EnsureSuccessStatusCode();
+
+            var response = await PostDutyAsync("Backdated Duty Person", "Engineer", new DateTime(2021, 1, 1));
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.NotNull(body);
+            Assert.False(body.Success);
+            Assert.Equal("A new duty for 'Backdated Duty Person' must start after their current duty, which started 2022-06-01.", body.Message);
+
+            var duties = await GetDutiesOldestFirstAsync("Backdated Duty Person");
+            Assert.Equal(2, duties.Count);
+            Assert.Equal("Commander", duties[1].DutyTitle);
+            Assert.Null(duties[1].DutyEndDate);
+        }
+
+        [Fact]
+        public async Task CreateAstronautDuty_StartsSameDayAsCurrentDuty_ReturnsConflict()
+        {
+            await CreatePersonAsync("Same Day Duty Person");
+            (await PostDutyAsync("Same Day Duty Person", "Pilot", new DateTime(2020, 1, 1))).EnsureSuccessStatusCode();
+
+            // Sent with a time of day, which must not make it count as starting later.
+            var response = await PostDutyAsync("Same Day Duty Person", "Commander", new DateTime(2020, 1, 1, 14, 0, 0));
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var duty = Assert.Single(await GetDutiesOldestFirstAsync("Same Day Duty Person"));
+            Assert.Equal("Pilot", duty.DutyTitle);
+            Assert.Null(duty.DutyEndDate);
+        }
+
+        [Fact]
+        public async Task CreateAstronautDuty_StartsDayAfterCurrentDuty_ClosesCurrentDutyThatDay()
+        {
+            await CreatePersonAsync("Next Day Duty Person");
+            (await PostDutyAsync("Next Day Duty Person", "Pilot", new DateTime(2020, 1, 1))).EnsureSuccessStatusCode();
+
+            var response = await PostDutyAsync("Next Day Duty Person", "Commander", new DateTime(2020, 1, 2));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var duties = await GetDutiesOldestFirstAsync("Next Day Duty Person");
+            Assert.Equal(2, duties.Count);
+            Assert.Equal(new DateTime(2020, 1, 1), duties[0].DutyEndDate);
+            Assert.Null(duties[1].DutyEndDate);
+        }
+
         private async Task CreatePersonAsync(string name)
         {
             var response = await _client.PostAsJsonAsync("/Person", name);
@@ -80,6 +131,16 @@ namespace StargateAPI.Tests
                 DutyTitle = dutyTitle,
                 DutyStartDate = dutyStartDate
             });
+        }
+
+        private async Task<List<AstronautDuty>> GetDutiesOldestFirstAsync(string name)
+        {
+            using var scope = _factory.Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<StargateContext>();
+            return await context.AstronautDuties.AsNoTracking()
+                .Where(d => d.Person.Name == name)
+                .OrderBy(d => d.DutyStartDate)
+                .ToListAsync();
         }
     }
 }
