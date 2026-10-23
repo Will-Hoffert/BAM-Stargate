@@ -116,6 +116,25 @@ namespace StargateAPI.Tests
             Assert.Null(duties[1].DutyEndDate);
         }
 
+        [Fact]
+        public async Task CreateAstronautDuty_RetiredInMixedCase_RetiresPerson()
+        {
+            await CreatePersonAsync("Mixed Case Retiree");
+            (await PostDutyAsync("Mixed Case Retiree", "Engineer", new DateTime(2018, 3, 1))).EnsureSuccessStatusCode();
+
+            var response = await PostDutyAsync("Mixed Case Retiree", "Retired", new DateTime(2024, 3, 1));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var scope = _factory.Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<StargateContext>();
+            var detail = await context.AstronautDetails.AsNoTracking().SingleAsync(d => d.Person.Name == "Mixed Case Retiree");
+            Assert.Equal(new DateTime(2024, 2, 29), detail.CareerEndDate);
+            Assert.Equal("RETIRED", detail.CurrentDutyTitle);
+
+            var duties = await GetDutiesOldestFirstAsync("Mixed Case Retiree");
+            Assert.Equal("RETIRED", duties[1].DutyTitle);
+        }
+
         private async Task CreatePersonAsync(string name)
         {
             var response = await _client.PostAsJsonAsync("/Person", name);

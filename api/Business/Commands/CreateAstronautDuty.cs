@@ -2,6 +2,7 @@
 using MediatR.Pipeline;
 using Microsoft.EntityFrameworkCore;
 using StargateAPI.Business.Data;
+using StargateAPI.Business.Rules;
 using StargateAPI.Controllers;
 using System.Globalization;
 using System.Net;
@@ -68,16 +69,20 @@ namespace StargateAPI.Business.Commands
             // CreateAstronautDutyPreProcessor checked this already, but the person can change before the handler runs.
             if (person is null) throw new BadHttpRequestException($"No person named '{request.Name}' exists.", StatusCodes.Status404NotFound);
 
+            var isRetirement = DutyRules.IsRetirement(request.DutyTitle);
+            // Store retirements with one spelling so later checks and readers can match it exactly.
+            var dutyTitle = isRetirement ? DutyRules.Retired : request.DutyTitle;
+
             var astronautDetail = person.AstronautDetail;
 
             if (astronautDetail == null)
             {
                 astronautDetail = new AstronautDetail();
                 astronautDetail.PersonId = person.Id;
-                astronautDetail.CurrentDutyTitle = request.DutyTitle;
+                astronautDetail.CurrentDutyTitle = dutyTitle;
                 astronautDetail.CurrentRank = request.Rank;
                 astronautDetail.CareerStartDate = request.DutyStartDate.Date;
-                if (request.DutyTitle == "RETIRED")
+                if (isRetirement)
                 {
                     astronautDetail.CareerEndDate = request.DutyStartDate.Date;
                 }
@@ -87,9 +92,9 @@ namespace StargateAPI.Business.Commands
             }
             else
             {
-                astronautDetail.CurrentDutyTitle = request.DutyTitle;
+                astronautDetail.CurrentDutyTitle = dutyTitle;
                 astronautDetail.CurrentRank = request.Rank;
-                if (request.DutyTitle == "RETIRED")
+                if (isRetirement)
                 {
                     astronautDetail.CareerEndDate = request.DutyStartDate.AddDays(-1).Date;
                 }
@@ -109,7 +114,7 @@ namespace StargateAPI.Business.Commands
             {
                 PersonId = person.Id,
                 Rank = request.Rank,
-                DutyTitle = request.DutyTitle,
+                DutyTitle = dutyTitle,
                 DutyStartDate = request.DutyStartDate.Date,
                 DutyEndDate = null
             };
