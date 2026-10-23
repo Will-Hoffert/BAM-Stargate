@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using StargateAPI.Business.Commands;
 using StargateAPI.Business.Data;
 using StargateAPI.Controllers;
 
@@ -17,24 +16,6 @@ namespace StargateAPI.Tests
         public ExceptionHandlingTests(StargateApiFactory factory)
         {
             _client = factory.CreateClient();
-        }
-
-        [Fact]
-        public async Task CreateAstronautDuty_UnknownPerson_ReturnsBadRequestEnvelope()
-        {
-            var response = await _client.PostAsJsonAsync("/AstronautDuty", new CreateAstronautDuty
-            {
-                Name = "Nobody By This Name",
-                Rank = "1LT",
-                DutyTitle = "Commander",
-                DutyStartDate = new DateTime(2020, 1, 1)
-            });
-
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
-            Assert.NotNull(body);
-            Assert.False(body.Success);
-            Assert.Equal((int)HttpStatusCode.BadRequest, body.ResponseCode);
         }
 
         [Fact]

@@ -86,6 +86,24 @@ namespace StargateAPI.Tests
         }
 
         [Fact]
+        public async Task CreateAstronautDuty_UnknownPerson_ReturnsNotFound()
+        {
+            var response = await _client.PostAsJsonAsync("/AstronautDuty", new CreateAstronautDuty
+            {
+                Name = "Nobody By This Name",
+                Rank = "1LT",
+                DutyTitle = "Commander",
+                DutyStartDate = new DateTime(2020, 1, 1)
+            });
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.NotNull(body);
+            Assert.False(body.Success);
+            Assert.Equal("No person named 'Nobody By This Name' exists.", body.Message);
+        }
+
+        [Fact]
         public async Task GetAstronautDutiesByName_PersonWithDuties_ReturnsDutiesNewestFirst()
         {
             await CreatePersonAsync("Duty History Person");
