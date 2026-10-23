@@ -1,6 +1,8 @@
 ﻿<!--v004-->
 # Stargate
 
+> **Solution notes:** see [SOLUTION.md](SOLUTION.md) for how to run it, the assumptions made, what was changed and why, and the follow-ups.
+
 ***
 
 ## Astronaut Career Tracking System (ACTS)
