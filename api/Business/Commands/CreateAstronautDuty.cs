@@ -122,9 +122,25 @@ namespace StargateAPI.Business.Commands
                 DutyEndDate = null
             };
 
-            await _context.AstronautDuties.AddAsync(newAstronautDuty);
+            // Close the previous duty in its own save before inserting the new one, so the current-duty index never sees
+            // two open duties; the transaction undoes that save if the insert fails. It starts after the reads on purpose:
+            // a request that lost a race for this person fails on the index instead of waiting and closing the winner's duty.
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
 
-            await _context.SaveChangesAsync();
+                await _context.AstronautDuties.AddAsync(newAstronautDuty, cancellationToken);
+
+                await _context.SaveChangesAsync(cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+            {
+                // Another request saved a duty for this person after this one read the current duty.
+                throw new BadHttpRequestException($"Another duty for '{person.Name}' was saved at the same time. Check their current duty and try again.", StatusCodes.Status409Conflict, ex);
+            }
 
             return new CreateAstronautDutyResult()
             {

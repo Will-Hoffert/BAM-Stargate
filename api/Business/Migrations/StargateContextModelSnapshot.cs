@@ -75,6 +75,10 @@ namespace StargateAPI.Migrations
 
                     b.HasIndex("PersonId");
 
+                    b.HasIndex(new[] { "PersonId" }, "IX_AstronautDuty_PersonId_CurrentDuty")
+                        .IsUnique()
+                        .HasFilter("[DutyEndDate] IS NULL");
+
                     b.ToTable("AstronautDuty");
                 });
 

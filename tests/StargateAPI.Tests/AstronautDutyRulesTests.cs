@@ -182,6 +182,22 @@ namespace StargateAPI.Tests
             Assert.Equal(new DateTime(2024, 2, 29), detail.CareerEndDate);
         }
 
+        [Fact]
+        public async Task AstronautDuty_SecondOpenDutyForPerson_IsRejectedByDatabase()
+        {
+            // Rules 3-4 hold in the database itself, whatever code does the writing.
+            await CreatePersonAsync("Two Open Duties Person");
+            (await PostDutyAsync("Two Open Duties Person", "Pilot", new DateTime(2020, 1, 1))).EnsureSuccessStatusCode();
+
+            using var scope = _factory.Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<StargateContext>();
+            var person = await context.People.SingleAsync(p => p.Name == "Two Open Duties Person");
+            context.AstronautDuties.Add(new AstronautDuty { PersonId = person.Id, Rank = "CPT", DutyTitle = "Commander", DutyStartDate = new DateTime(2021, 1, 1) });
+
+            var exception = await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+            Assert.True(exception.IsUniqueConstraintViolation());
+        }
+
         private async Task CreatePersonAsync(string name)
         {
             var response = await _client.PostAsJsonAsync("/Person", name);

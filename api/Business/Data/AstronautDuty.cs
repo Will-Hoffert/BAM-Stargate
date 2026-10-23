@@ -28,6 +28,10 @@ namespace StargateAPI.Business.Data
         {
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Id).ValueGeneratedOnAdd();
+            // Declared so EF keeps it: the filtered index below only covers current duties, not a person's whole history.
+            builder.HasIndex(x => x.PersonId);
+            // Rules 3-4: a person has at most one current duty, the one without an end date.
+            builder.HasIndex(x => x.PersonId, "IX_AstronautDuty_PersonId_CurrentDuty").IsUnique().HasFilter("[DutyEndDate] IS NULL");
         }
     }
 }
