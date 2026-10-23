@@ -29,17 +29,14 @@ namespace StargateAPI.Tests
         }
 
         [Fact]
-        public async Task GetPersonByName_SqlInjectionAttempt_ReturnsNoPerson()
+        public async Task GetPersonByName_SqlInjectionAttempt_ReturnsNotFound()
         {
             // A person the injected condition would match if the name were spliced into the SQL.
             await CreatePersonAsync("Injection Target");
 
             var response = await _client.GetAsync($"/Person/{Uri.EscapeDataString("' OR 1=1 OR '")}");
 
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var body = await response.Content.ReadFromJsonAsync<GetPersonByNameResult>();
-            Assert.NotNull(body);
-            Assert.Null(body.Person);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
 
         [Fact]

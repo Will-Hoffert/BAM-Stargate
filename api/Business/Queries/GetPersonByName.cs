@@ -25,9 +25,11 @@ namespace StargateAPI.Business.Queries
 
             var query = "SELECT a.Id as PersonId, a.Name, b.CurrentRank, b.CurrentDutyTitle, b.CareerStartDate, b.CareerEndDate FROM [Person] a LEFT JOIN [AstronautDetail] b on b.PersonId = a.Id WHERE @Name = a.Name";
 
-            var person = await _context.Connection.QueryAsync<PersonAstronaut>(query, new { request.Name });
+            var person = await _context.Connection.QueryFirstOrDefaultAsync<PersonAstronaut>(query, new { request.Name });
 
-            result.Person = person.FirstOrDefault();
+            if (person is null) throw new BadHttpRequestException($"No person named '{request.Name}' exists.", StatusCodes.Status404NotFound);
+
+            result.Person = person;
 
             return result;
         }
