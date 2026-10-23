@@ -30,7 +30,7 @@ namespace StargateAPI.Business.Commands
             _context = context;
         }
 
-        public Task Process(CreateAstronautDuty request, CancellationToken cancellationToken)
+        public async Task Process(CreateAstronautDuty request, CancellationToken cancellationToken)
         {
             // The request's own values are checked before any database read, and written back so every later check and the handler use them.
             // The name only identifies an existing person, so it isn't held to the length limit for new names.
@@ -39,19 +39,19 @@ namespace StargateAPI.Business.Commands
             request.DutyTitle = DutyRules.ValidateDutyTitle(request.DutyTitle);
             request.DutyStartDate = DutyRules.ValidateStartDate(request.DutyStartDate);
 
-            var person = _context.People.AsNoTracking().FirstOrDefault(z => z.Name == request.Name);
+            var person = await _context.People.AsNoTracking().FirstOrDefaultAsync(z => z.Name == request.Name, cancellationToken);
 
             if (person is null) throw new BadHttpRequestException($"No person named '{request.Name}' exists.", StatusCodes.Status404NotFound);
 
             // Start dates are stored without the time of day, so compare against the date only.
-            var verifyNoPreviousDuty = _context.AstronautDuties.FirstOrDefault(z => z.PersonId == person.Id && z.DutyTitle == request.DutyTitle && z.DutyStartDate == request.DutyStartDate.Date);
+            var verifyNoPreviousDuty = await _context.AstronautDuties.FirstOrDefaultAsync(z => z.PersonId == person.Id && z.DutyTitle == request.DutyTitle && z.DutyStartDate == request.DutyStartDate.Date, cancellationToken);
 
             if (verifyNoPreviousDuty is not null) throw new BadHttpRequestException($"'{person.Name}' already has a {request.DutyTitle} duty starting {request.DutyStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.", StatusCodes.Status409Conflict);
 
-            var currentDuty = _context.AstronautDuties.AsNoTracking()
+            var currentDuty = await _context.AstronautDuties.AsNoTracking()
                 .Where(z => z.PersonId == person.Id)
                 .OrderByDescending(z => z.DutyStartDate)
-                .FirstOrDefault();
+                .FirstOrDefaultAsync(cancellationToken);
 
             // RETIRED is terminal, so a retired person's duty history is complete.
             if (currentDuty is not null && DutyRules.IsRetirement(currentDuty.DutyTitle)) throw new BadHttpRequestException($"'{person.Name}' retired on {currentDuty.DutyStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} and can't be given new duties.", StatusCodes.Status409Conflict);
@@ -61,8 +61,6 @@ namespace StargateAPI.Business.Commands
 
             // Rule 7 ends a career the day before RETIRED starts, which only works for someone who has served.
             if (currentDuty is null && DutyRules.IsRetirement(request.DutyTitle)) throw new BadHttpRequestException($"'{person.Name}' has no astronaut duties yet, so RETIRED can't be their first duty.", StatusCodes.Status400BadRequest);
-
-            return Task.CompletedTask;
         }
     }
 
@@ -98,7 +96,7 @@ namespace StargateAPI.Business.Commands
                 astronautDetail.CareerStartDate = request.DutyStartDate.Date;
                 // CreateAstronautDutyPreProcessor rejects RETIRED as a first duty, so a first duty never ends a career.
 
-                await _context.AstronautDetails.AddAsync(astronautDetail);
+                await _context.AstronautDetails.AddAsync(astronautDetail, cancellationToken);
 
             }
             else

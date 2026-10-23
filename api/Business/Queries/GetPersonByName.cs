@@ -28,7 +28,7 @@ namespace StargateAPI.Business.Queries
 
             var name = PersonRules.NormalizeName(request.Name);
 
-            var person = await _context.Connection.QueryFirstOrDefaultAsync<PersonAstronaut>(query, new { Name = name });
+            var person = await _context.Connection.QueryFirstOrDefaultAsync<PersonAstronaut>(new CommandDefinition(query, new { Name = name }, cancellationToken: cancellationToken));
 
             if (person is null) throw new BadHttpRequestException($"No person named '{name}' exists.", StatusCodes.Status404NotFound);
 

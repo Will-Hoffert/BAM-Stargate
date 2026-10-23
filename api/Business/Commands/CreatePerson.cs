@@ -19,16 +19,14 @@ namespace StargateAPI.Business.Commands
         {
             _context = context;
         }
-        public Task Process(CreatePerson request, CancellationToken cancellationToken)
+        public async Task Process(CreatePerson request, CancellationToken cancellationToken)
         {
             // Written back so the duplicate check below and the handler's saved row both use the normalized name.
             request.Name = PersonRules.ValidateName(request.Name);
 
-            var person = _context.People.AsNoTracking().FirstOrDefault(z => z.Name == request.Name);
+            var person = await _context.People.AsNoTracking().FirstOrDefaultAsync(z => z.Name == request.Name, cancellationToken);
 
             if (person is not null) throw new BadHttpRequestException($"A person named '{request.Name}' already exists.", StatusCodes.Status409Conflict);
-
-            return Task.CompletedTask;
         }
     }
 
@@ -48,11 +46,11 @@ namespace StargateAPI.Business.Commands
                    Name = request.Name
                 };
 
-                await _context.People.AddAsync(newPerson);
+                await _context.People.AddAsync(newPerson, cancellationToken);
 
                 try
                 {
-                    await _context.SaveChangesAsync();
+                    await _context.SaveChangesAsync(cancellationToken);
                 }
                 catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
                 {

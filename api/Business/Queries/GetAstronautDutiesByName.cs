@@ -30,7 +30,7 @@ namespace StargateAPI.Business.Queries
 
             var name = PersonRules.NormalizeName(request.Name);
 
-            var person = await _context.Connection.QueryFirstOrDefaultAsync<PersonAstronaut>(query, new { Name = name });
+            var person = await _context.Connection.QueryFirstOrDefaultAsync<PersonAstronaut>(new CommandDefinition(query, new { Name = name }, cancellationToken: cancellationToken));
 
             if (person is null) throw new BadHttpRequestException($"No person named '{name}' exists.", StatusCodes.Status404NotFound);
 
@@ -38,7 +38,7 @@ namespace StargateAPI.Business.Queries
 
             query = "SELECT Id, Rank, DutyTitle, DutyStartDate, DutyEndDate FROM [AstronautDuty] WHERE @PersonId = PersonId Order By DutyStartDate Desc";
 
-            var duties = await _context.Connection.QueryAsync<AstronautDutyDto>(query, new { person.PersonId });
+            var duties = await _context.Connection.QueryAsync<AstronautDutyDto>(new CommandDefinition(query, new { person.PersonId }, cancellationToken: cancellationToken));
 
             result.AstronautDuties = duties.ToList();
 
