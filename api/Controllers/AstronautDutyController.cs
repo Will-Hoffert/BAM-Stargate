@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Mvc;
 using StargateAPI.Business.Commands;
 using StargateAPI.Business.Queries;
-using System.Net;
 
 namespace StargateAPI.Controllers
 {
@@ -19,24 +18,12 @@ namespace StargateAPI.Controllers
         [HttpGet("{name}")]
         public async Task<IActionResult> GetAstronautDutiesByName(string name)
         {
-            try
+            var result = await _mediator.Send(new GetPersonByName()
             {
-                var result = await _mediator.Send(new GetPersonByName()
-                {
-                    Name = name
-                });
+                Name = name
+            });
 
-                return this.GetResponse(result);
-            }
-            catch (Exception ex)
-            {
-                return this.GetResponse(new BaseResponse()
-                {
-                    Message = ex.Message,
-                    Success = false,
-                    ResponseCode = (int)HttpStatusCode.InternalServerError
-                });
-            }            
+            return this.GetResponse(result);
         }
 
         [HttpPost("")]
