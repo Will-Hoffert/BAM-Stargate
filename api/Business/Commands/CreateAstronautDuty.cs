@@ -5,7 +5,6 @@ using StargateAPI.Business.Data;
 using StargateAPI.Business.Rules;
 using StargateAPI.Controllers;
 using System.Globalization;
-using System.Net;
 
 namespace StargateAPI.Business.Commands
 {
