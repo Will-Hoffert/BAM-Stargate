@@ -17,7 +17,7 @@ This document covers how to run the solution, the assumptions it makes, what was
 
 ## Summary
 
-**API (required).** All five endpoints work. Person update was missing and is now a rename, `PUT /Person/{name}`. The seven rules are enforced in code and, where it matters, by the database. The review found 25 flaws in the provided code. 23 are fixed, one per commit, starting with SQL injection, a broken endpoint, crashes and unenforced rules; the other 2 are follow-ups (see the [fix table](#what-was-wrong-and-the-fixes)).
+**API (required).** All five endpoints work. Person update was missing and is now a rename, `PUT /Person/{name}`. The seven rules are enforced in code and, where it matters, by the database. The review found 25 flaws in the provided code. 24 are fixed, one per commit, starting with SQL injection, a broken endpoint, crashes and unenforced rules; the remaining one is a follow-up (see the [fix table](#what-was-wrong-and-the-fixes)).
 
 | Method | Path | What it does | Errors it can return |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Every response, success or error, uses the existing envelope `{ success, message
 - **Database:** generated from EF Core migrations: the provided initial one, plus five that each make one schema change.
 - **Rules:** enforced (see [the seven rules](#the-seven-rules)).
 - **Defensive coding:** input validation, parameterized SQL, cancellation, and database constraints that close race conditions.
-- **Tests:** 120 API tests with **99.61% line / 96.42% branch coverage** (migrations excluded; the task asked for over 50%). There are also 107 UI tests.
+- **Tests:** 123 API tests with **99.61% line / 96.42% branch coverage** (migrations excluded; the task asked for over 50%). There are also 107 UI tests.
 - **Process logging:** every request's outcome (success, rejection or exception) goes to a `ProcessLog` table.
 
 **UI (encouraged).** An Angular 22 app in `ui/`:
@@ -160,7 +160,7 @@ The README numbers every rule "1."; they're numbered 1–7 here in the order wri
 | # | Rule | How it's interpreted and enforced |
 |---|---|---|
 | 1 | A Person is uniquely identified by their Name. | Names are unique **ignoring case** and **surrounding spaces**: names are trimmed, and "john doe" counts as "John Doe". Enforced by a pre-processor check (409), then by a unique index with SQLite's `NOCASE` collation, which also catches two requests racing. A new name must not be blank and is at most 100 characters (400). The limit is enforced in code because SQLite ignores declared column lengths. Lookups by name are case-insensitive and ignore surrounding spaces. |
-| 2 | A Person who has not had an astronaut assignment will not have Astronaut records. | A person exists without being an astronaut. Adding or renaming a person never creates astronaut records. The only path that creates `AstronautDetail` is a person's **first duty**, and it saves the detail and the duty in one transaction. No endpoint creates or edits `AstronautDetail` directly. Reads use `LEFT JOIN`, so people with no assignment are still returned, with null dates. Their rank and duty title come back as an empty string (`""`) rather than null, a known issue ([follow-up 1](#first)). `GET /AstronautDuty/{name}` returns 200 with an empty list for them (404 only means no such person). The database doesn't enforce this rule itself; it holds because there's one atomic write path. |
+| 2 | A Person who has not had an astronaut assignment will not have Astronaut records. | A person exists without being an astronaut. Adding or renaming a person never creates astronaut records. The only path that creates `AstronautDetail` is a person's **first duty**, and it saves the detail and the duty in one transaction. No endpoint creates or edits `AstronautDetail` directly. Reads use `LEFT JOIN`, so people with no assignment are still returned, with null rank, duty title and dates (fix-table row 25). `GET /AstronautDuty/{name}` returns 200 with an empty list for them (404 only means no such person). The database doesn't enforce this rule itself; it holds because there's one atomic write path. |
 | 3 | A Person will only ever hold one current Astronaut Duty Title, Start Date, and Rank at a time. | `AstronautDetail` holds the current values, one row per person (unique index on `PersonId`). A partial unique index allows only one open duty per person (`AstronautDuty(PersonId) WHERE DutyEndDate IS NULL`). Two duties saved at the same moment get a 409 instead of producing two current duties. |
 | 4 | A Person's Current Duty will not have a Duty End Date. | "Current duty" means the duty with no end date, which is the latest one received. It does **not** mean "the duty whose dates include today"; see the future-start-date gap below. |
 | 5 | A Person's Previous Duty End Date is set to the day before the New Astronaut Duty Start Date when a new Astronaut Duty is received for a Person. | Applied when a duty is added. A new duty must start **after** the current duty's start date (409 otherwise); otherwise the previous duty would end before it began. Starting the very next day is allowed, which gives a one-day duty. A duty with the same title and start date for the same person is a duplicate (409). |
@@ -206,8 +206,6 @@ All of them use the `BaseResponse` envelope. Requests that ASP.NET itself reject
   - **Retired:** they have a career end date.
   - **Active:** they have a duty.
   - **Not an astronaut yet:** neither.
-
-  **Known issue:** against the running API, people with no duties currently show as **Active**, because the API sends their duty title as `""` rather than null ([follow-up 1](#first)).
 - **Retired people can't be offered a new duty,** so their timeline shows a note instead of the button. They can still be renamed.
 - **The UI repeats the simple rules for quicker feedback:** name, rank and title lengths, required fields, and a start date after the current duty. It uses the API's exact messages, and the API stays the authority. Duplicates and the other rules are checked only by the API, and its message is shown.
 
@@ -253,7 +251,7 @@ Each fix is its own commit with its regression test. Commits are listed by short
 | 22 | The "update a person" requirement was missing. | `PUT /Person/{name}`. | 5ef3edc |
 | 23 | No process logging. | `ProcessLog` table (da8aa35), a logging pipeline behavior (7ddc340), `GET /ProcessLog` (8a433df). | da8aa35, 7ddc340, 8a433df |
 | 24 | Out-of-date packages (EF Core 8.0.4; a model snapshot from EF 7.0.15), and the business layer throwing ASP.NET's `BadHttpRequestException`. | Not changed yet: both are [follow-ups](#follow-ups). | |
-| 25 | People with no astronaut record come back with `""` for `currentRank` and `currentDutyTitle`, but `null` dates. `PersonAstronaut` defaults both strings to `string.Empty`, and Dapper leaves a property at its default when the column is NULL. Found by the fresh-clone rehearsal of the run instructions. | Not changed yet: [follow-up 1](#first). | |
+| 25 | People with no astronaut record came back with `""` for `currentRank` and `currentDutyTitle`, but `null` dates, so the UI showed them as Active. `PersonAstronaut` defaulted both strings to `string.Empty`, and Dapper leaves a property at its default when the column is NULL. Found by the fresh-clone rehearsal of the run instructions. | Both nullable with no default, so all four fields are `null` (rule 2). Response shape only; no migration. | 792253f |
 
 </details>
 
@@ -327,12 +325,12 @@ Each fix is its own commit with its regression test. Commits are listed by short
 
 ## Testing
 
-### API (120 tests)
+### API (123 tests)
 
 - **Setup:** xUnit and `WebApplicationFactory`. Each test class gets its own in-memory SQLite database, built by the real migrations, so tests exercise the real SQL, including Dapper's.
 - **HTTP-level tests are preferred.** Handler- and behavior-level tests cover what HTTP can't reach, such as races and cancellation.
 - **Test classes:**
-  - **People:** endpoints, rules, validation, rename.
+  - **People:** endpoints, rules, validation, rename, and people with no duties.
   - **Duties:** endpoints, rules, validation, the handler.
   - **Cross-cutting:** SQL injection, exception handling, cancellation, CORS, process logging (the table, the behavior and the endpoint).
 - **Coverage:** 99.61% line, 96.42% branch, 98.37% method. Migrations are excluded. The command is in [Tests](#tests).
@@ -354,8 +352,8 @@ Each fix is its own commit with its regression test. Commits are listed by short
 
 ### Not automated
 
-- **A fresh-clone rehearsal** of [Run it on a new machine](#run-it-on-a-new-machine), done by hand. Every command worked as written, and calling the running API exposed the empty-string issue in [follow-up 1](#first).
-- **End-to-end browser tests** against a running API (a [follow-up](#quality-and-ci)). Those would have caught follow-up 1 automatically.
+- **A fresh-clone rehearsal** of [Run it on a new machine](#run-it-on-a-new-machine), done by hand. Every command worked as written, and calling the running API exposed the empty-string issue now fixed in 792253f (fix-table row 25).
+- **End-to-end browser tests** against a running API (a [follow-up](#quality-and-ci)). Those would have caught that issue automatically.
 - **Migration rehearsals** were done by hand on database copies, with the SQL checks below.
 
 ## Before deploying to an existing database
@@ -381,47 +379,41 @@ Not done, roughly in priority order within each group.
 
 ### First
 
-1. **People with no duties show as "Active" in the UI.** A known bug, found while verifying the run instructions against a fresh clone.
-   - **What:** for a person with no duties, the API returns `"currentRank": ""` and `"currentDutyTitle": ""` instead of `null`, while their dates are `null`.
-   - **Why:** the provided `PersonAstronaut` DTO defaults both strings to `string.Empty`, and Dapper leaves a property at its default when the column is NULL.
-   - **Effect in the UI:** the UI treats a non-null duty title as Active, so these people show as Active instead of "Not an astronaut yet". A search for "not an astronaut" finds no one, and their blank ranks sort first instead of last.
-   - **Why the tests missed it:** the UI's tests use `null` for this case, and no API test covers a person with no duties.
-   - **Fix:** make `CurrentRank` and `CurrentDutyTitle` nullable with no default, so a missing astronaut record is `null` in every field, matching the dates and rule 2. Write the API test first (a person with no duties returns `null` rank and title), and add a UI test that uses the API's real response. Optionally, the UI could also treat `""` as missing, as a safety net.
-2. **Upgrade to .NET 10 LTS.** .NET 8 reaches end of support on 2026-11-10.
-3. **Package updates.** EF Core and the other Microsoft packages are on 8.0.4; the latest 8.0 patch is 8.0.32. Move `dotnet-ef` in step with EF Core, and keep MediatR on 12.x (license).
-4. **UI tooling advisory.** `npm audit` reports a high-severity advisory in Vite 8.3.0, which `@angular/build` 22.2.4 (the latest stable) pins. Vite is only the dev server and the build and test tooling; nothing from it ships in the built app. Update `@angular/build` and `@angular/cli` together once a fixed release is stable. `npm audit fix --force` would downgrade `@angular/build` out of step with the CLI, so don't use it.
+1. **Upgrade to .NET 10 LTS.** .NET 8 reaches end of support on 2026-11-10.
+2. **Package updates.** EF Core and the other Microsoft packages are on 8.0.4; the latest 8.0 patch is 8.0.32. Move `dotnet-ef` in step with EF Core, and keep MediatR on 12.x (license).
+3. **UI tooling advisory.** `npm audit` reports a high-severity advisory in Vite 8.3.0, which `@angular/build` 22.2.4 (the latest stable) pins. Vite is only the dev server and the build and test tooling; nothing from it ships in the built app. Update `@angular/build` and `@angular/cli` together once a fixed release is stable. `npm audit fix --force` would downgrade `@angular/build` out of step with the CLI, so don't use it.
 
 ### Security
 
-5. **Authentication** for the external feed and the UI: an API key or OAuth client credentials. CORS stays limited to named origins, and it isn't security.
-6. **An admin role for the process log** once authentication exists. Its entries include request bodies, which means people's names.
+4. **Authentication** for the external feed and the UI: an API key or OAuth client credentials. CORS stays limited to named origins, and it isn't security.
+5. **An admin role for the process log** once authentication exists. Its entries include request bodies, which means people's names.
 
 ### API and data
 
-7. **Reject duty start dates in the future.** Today a future-dated duty becomes current immediately (see [dates](#dates)).
+6. **Reject duty start dates in the future.** Today a future-dated duty becomes current immediately (see [dates](#dates)).
    - **Example from development data:** a duty posted on 2026-10-23 starting 2026-11-01 closed the duty the person was actually serving and showed as Current, "Not started yet".
    - **Fix:** `CreateAstronautDutyPreProcessor` returns 400 "A duty can't start in the future.", allowing one day past the server's UTC date so a caller ahead of UTC can still enter their own today. The UI's date picker gets the same limit in the same change.
    - **If scheduled assignments are a real need,** the alternative is to work out "current" as the duty whose dates include today, at read time. That's a model change away from rule 4's wording.
-8. **Stable links after a rename.** People are addressed by name, so after a rename, bookmarks and shared links to the old name show "No person named … exists." (The UI already keeps Back from landing there.) Stable links need ID-based addresses (`/people/7`) and `GET /Person/{id}` (and duties by ID), keeping names for display and search.
-9. **Optimistic concurrency for updates:**
+7. **Stable links after a rename.** People are addressed by name, so after a rename, bookmarks and shared links to the old name show "No person named … exists." (The UI already keeps Back from landing there.) Stable links need ID-based addresses (`/people/7`) and `GET /Person/{id}` (and duties by ID), keeping names for display and search.
+8. **Optimistic concurrency for updates:**
    - an ETag on `GET /Person/{name}` and `If-Match` on `PUT`;
    - backed by a version column that EF checks as a concurrency token;
    - a stale update gets 412.
 
    This matters once a person has fields that can change without changing the URL.
-10. **`DateOnly` for duty dates,** so a date sent with a UTC offset can't shift a day.
-11. **Idempotency keys** for the external feed, so a retried request can't add a duty twice.
-12. **Pagination for `GET /Person`.**
-13. **`GET /ProcessLog` pagination and filters:**
+9. **`DateOnly` for duty dates,** so a date sent with a UTC offset can't shift a day.
+10. **Idempotency keys** for the external feed, so a retried request can't add a duty twice.
+11. **Pagination for `GET /Person`.**
+12. **`GET /ProcessLog` pagination and filters:**
     - an ID cursor (`?before=<id>`), relying on the AUTOINCREMENT order the query already uses;
     - filters such as `?level=Error`;
     - a retention policy for the table.
-14. **Domain exceptions.** Replace `BadHttpRequestException` in the business layer with `NotFoundException`, `ConflictException` and `ValidationException`, mapped in `GlobalExceptionHandler`, so business rules don't depend on ASP.NET.
-15. **Move `BaseResponse` out of the Controllers namespace.** Today the business layer depends on Controllers.
-16. **Clearer binding messages.** A few ASP.NET messages still name .NET types, for example "could not be converted to System.DateTime", or the command's class name when the body isn't a JSON object.
-17. **Log the requests ASP.NET rejects before MediatR,** from the `InvalidModelStateResponseFactory`, if those should appear in `ProcessLog` too.
-18. **Queue log writes in the background** if their few milliseconds per request ever matter.
-19. **OpenAPI documentation.** Swagger lists only a bare "200" for every endpoint, because the actions return `IActionResult`:
+13. **Domain exceptions.** Replace `BadHttpRequestException` in the business layer with `NotFoundException`, `ConflictException` and `ValidationException`, mapped in `GlobalExceptionHandler`, so business rules don't depend on ASP.NET.
+14. **Move `BaseResponse` out of the Controllers namespace.** Today the business layer depends on Controllers.
+15. **Clearer binding messages.** A few ASP.NET messages still name .NET types, for example "could not be converted to System.DateTime", or the command's class name when the body isn't a JSON object.
+16. **Log the requests ASP.NET rejects before MediatR,** from the `InvalidModelStateResponseFactory`, if those should appear in `ProcessLog` too.
+17. **Queue log writes in the background** if their few milliseconds per request ever matter.
+18. **OpenAPI documentation.** Swagger lists only a bare "200" for every endpoint, because the actions return `IActionResult`:
     - **Declare each endpoint's responses:** the result type for 200, and the 400/404/409 envelope it can really return. Declare 500 once, globally, and add `[Produces("application/json")]`.
     - **Show the input rules in the document:** required fields, the 100-character limits, and `take`'s default and range. Use a small Swagger filter reading the validation constants, not `[MaxLength]` attributes, which would make ASP.NET reject with its own messages.
     - **Add a short description of each endpoint** and the rules it applies, for example that `POST /AstronautDuty` closes the current duty and that RETIRED ends a career.
@@ -429,29 +421,29 @@ Not done, roughly in priority order within each group.
 
 ### User interface
 
-20. **A process activity panel:** a page listing the newest `ProcessLog` entries, with level chips, operation, message, time and duration, plus Refresh. The endpoint and client method already exist. It should be admin-only once authentication exists.
-21. **Snackbar (toast) notifications** for messages that should outlive a dialog: confirmations such as "Duty added for John Doe", and failures after a dialog has closed. Today the API's messages show inside the dialog, where they stay until fixed and screen readers announce them.
-22. **Bundle the fonts.** Roboto and the Material Symbols icons come from Google Fonts today. Bundling them with the app (for example `@fontsource/roboto` and `material-symbols`):
+19. **A process activity panel:** a page listing the newest `ProcessLog` entries, with level chips, operation, message, time and duration, plus Refresh. The endpoint and client method already exist. It should be admin-only once authentication exists.
+20. **Snackbar (toast) notifications** for messages that should outlive a dialog: confirmations such as "Duty added for John Doe", and failures after a dialog has closed. Today the API's messages show inside the dialog, where they stay until fixed and screen readers announce them.
+21. **Bundle the fonts.** Roboto and the Material Symbols icons come from Google Fonts today. Bundling them with the app (for example `@fontsource/roboto` and `material-symbols`):
     - avoids a request to Google from every user's browser, a privacy concern especially under GDPR;
     - keeps the UI working on networks that block Google;
     - simplifies a strict Content Security Policy;
     - pins the font versions with the app.
-23. **A cosmetic date-picker quirk.** Material's native date adapter writes the date input's `min` attribute from UTC date parts, so east of UTC that attribute reads a day early. The calendar itself uses local dates and behaves correctly. A custom adapter, or a date-library adapter, would make the attribute match.
+22. **A cosmetic date-picker quirk.** Material's native date adapter writes the date input's `min` attribute from UTC date parts, so east of UTC that attribute reads a day early. The calendar itself uses local dates and behaves correctly. A custom adapter, or a date-library adapter, would make the attribute match.
 
 ### Quality and CI
 
-24. **CI on every push:**
+23. **CI on every push:**
     - **API:** `dotnet build` (0 warnings), `dotnet test` with the 50% coverage gate, and `dotnet ef migrations has-pending-model-changes`.
     - **UI:** `npm ci`, `npm test -- --watch=false` in a time zone ahead of UTC and one behind, `npm run build`, and `npm audit`.
-25. **End-to-end browser tests** (for example Playwright) running the UI against a real API and a throwaway database.
-26. **Treat nullable warnings as build errors** (`WarningsAsErrors=Nullable`), so the 0-warning state can't drift.
+24. **End-to-end browser tests** (for example Playwright) running the UI against a real API and a throwaway database.
+25. **Treat nullable warnings as build errors** (`WarningsAsErrors=Nullable`), so the 0-warning state can't drift.
 
 ### Operations and tooling
 
-27. **Run migrations as a deployment step.** Use a migration bundle after the [pre-deploy checks](#before-deploying-to-an-existing-database), rather than at application startup. Today the database is created with `dotnet ef database update`.
-28. **Health checks, OpenTelemetry and containerization.**
-29. **HTTPS:** terminate TLS in front of the API in a deployment. Locally, the `http` profile is used.
-30. **Recommend VS Code extensions** in a root `.vscode/extensions.json`: C# Dev Kit, Angular Language Service, SQLite Viewer.
+26. **Run migrations as a deployment step.** Use a migration bundle after the [pre-deploy checks](#before-deploying-to-an-existing-database), rather than at application startup. Today the database is created with `dotnet ef database update`.
+27. **Health checks, OpenTelemetry and containerization.**
+28. **HTTPS:** terminate TLS in front of the API in a deployment. Locally, the `http` profile is used.
+29. **Recommend VS Code extensions** in a root `.vscode/extensions.json`: C# Dev Kit, Angular Language Service, SQLite Viewer.
 
 ## Commit history
 
@@ -509,5 +501,7 @@ Not done, roughly in priority order within each group.
 | f3a1425 | feat(ui): create a person from a dialog |
 | 4b018bd | feat(ui): add a duty from a person's timeline |
 | 621ce83 | Rename a person from their timeline |
+| 92c4670 | add SOLUTION.md |
+| 792253f | fix(api): null rank and duty title for people with no duties |
 
 </details>
