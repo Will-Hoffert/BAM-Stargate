@@ -48,6 +48,9 @@ namespace StargateAPI.Business.Commands
 
             if (currentDuty is not null && request.DutyStartDate.Date <= currentDuty.DutyStartDate) throw new BadHttpRequestException($"A new duty for '{person.Name}' must start after their current duty, which started {currentDuty.DutyStartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.", StatusCodes.Status409Conflict);
 
+            // Rule 7 ends a career the day before RETIRED starts, which only works for someone who has served.
+            if (currentDuty is null && DutyRules.IsRetirement(request.DutyTitle)) throw new BadHttpRequestException($"'{person.Name}' has no astronaut duties yet, so RETIRED can't be their first duty.", StatusCodes.Status400BadRequest);
+
             return Task.CompletedTask;
         }
     }
@@ -82,10 +85,7 @@ namespace StargateAPI.Business.Commands
                 astronautDetail.CurrentDutyTitle = dutyTitle;
                 astronautDetail.CurrentRank = request.Rank;
                 astronautDetail.CareerStartDate = request.DutyStartDate.Date;
-                if (isRetirement)
-                {
-                    astronautDetail.CareerEndDate = request.DutyStartDate.Date;
-                }
+                // CreateAstronautDutyPreProcessor rejects RETIRED as a first duty, so a first duty never ends a career.
 
                 await _context.AstronautDetails.AddAsync(astronautDetail);
 

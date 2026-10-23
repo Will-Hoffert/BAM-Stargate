@@ -135,6 +135,26 @@ namespace StargateAPI.Tests
             Assert.Equal("RETIRED", duties[1].DutyTitle);
         }
 
+        [Fact]
+        public async Task CreateAstronautDuty_RetiredAsFirstDuty_ReturnsBadRequest()
+        {
+            await CreatePersonAsync("Never Served Person");
+
+            var response = await PostDutyAsync("Never Served Person", "RETIRED", new DateTime(2024, 3, 1));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BaseResponse>();
+            Assert.NotNull(body);
+            Assert.False(body.Success);
+            Assert.Equal("'Never Served Person' has no astronaut duties yet, so RETIRED can't be their first duty.", body.Message);
+
+            // Rule 2: a person who never had an astronaut assignment has no astronaut records.
+            Assert.Empty(await GetDutiesOldestFirstAsync("Never Served Person"));
+            using var scope = _factory.Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<StargateContext>();
+            Assert.False(await context.AstronautDetails.AnyAsync(d => d.Person.Name == "Never Served Person"));
+        }
+
         private async Task CreatePersonAsync(string name)
         {
             var response = await _client.PostAsJsonAsync("/Person", name);
